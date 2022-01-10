@@ -1,23 +1,26 @@
 use clap::{App, Arg};
 use anyhow::Result;
+use std::path::PathBuf;
+use std::fs::File;
 
 use crate::ui_main::*;
+use crate::registry_hive::*;
 
-pub struct RegViewApplication {}
+pub struct RegViewApplication {
+    hive: RegistryHive,
+}
 
 impl RegViewApplication {
     pub fn new() -> Result<Self> {
-        let mut me = Self {};
-        me.parse_options()?;
-        Ok(me)
+        Self::parse_options()
     }
 
-    pub fn run(&self) -> Result<()> {
-        let ui = UIMain::new();
+    pub fn run(mut self) -> Result<()> {
+        let ui = UIMain::new(self.hive);
         ui.run()
     }
 
-    fn parse_options(&mut self) -> Result<()> {
+    fn parse_options() -> Result<Self> {
         let app = App::new(env!("CARGO_PKG_NAME"))
             .version(env!("CARGO_PKG_VERSION"))
             .author(env!("CARGO_PKG_AUTHORS"))
@@ -32,6 +35,15 @@ impl RegViewApplication {
             );
         
         let matches = app.get_matches();
-        Ok(())
+        let filename = matches.value_of("REG_FILE").expect("missing hive filename");
+        let fp = PathBuf::from(&filename);
+        let reg_file = if ! (fp.exists() && fp.is_file()) {
+            return Err(anyhow::Error::msg(format!("File {} does not exist", &filename)));
+        } else {
+            File::open(fp)?
+        };
+        Ok(Self {
+            hive: RegistryHive::new(reg_file)?
+        })
     }
 }
