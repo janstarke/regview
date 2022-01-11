@@ -77,18 +77,7 @@ impl RegistryHive {
                 Some(node) => node
             };
 
-            let data = match value.decode_data()? {
-                None => { "NONE".to_owned() }
-                Some(data) => {
-                    match data {
-                        Data::None => "NONE".to_owned(),
-                        Data::String(s) => s,
-                        Data::Int32(i) => i.to_string()
-
-                    }
-                }
-            };
-            values.push(ValuesLine::new(&data));
+            values.push(ValuesLine::from(&value)?);
         }
         Ok(values)
     }

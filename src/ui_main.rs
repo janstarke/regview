@@ -33,7 +33,9 @@ impl UIMain {
         keys_table.set_on_select(UIMain::on_select);
 
         let mut details_table = TableView::<ValuesLine, ValuesColumn>::new()
-            .column(ValuesColumn::Name, "Name", |c| c.width_percent(100));
+            .column(ValuesColumn::Name, "Name", |c| {c})
+            .column(ValuesColumn::Data, "Value", |c| {c.width(8)})
+            .column(ValuesColumn::Type, "Datatype", |c| {c});
 
         details_table.set_enabled(false);
 
@@ -83,8 +85,12 @@ impl UIMain {
         let new_items = match keys_table.borrow_item(index) {
             None => { return },
             Some(item) => {
-                let hive: &mut RegistryHive = siv.user_data().unwrap();
-                hive.key_values(item.record()).unwrap()
+                if item.is_parent() {
+                    Vec::new()
+                } else {
+                    let hive: &mut RegistryHive = siv.user_data().unwrap();
+                    hive.key_values(item.record()).unwrap()
+                }
             }
         };
 
