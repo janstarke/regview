@@ -4,7 +4,8 @@ use simplelog::{TermLogger, LevelFilter, Config, TerminalMode, ColorChoice};
 mod ui_main;
 mod regviewapplication;
 mod registry_hive;
-mod table_line;
+mod keys_line;
+mod values_line;
 use regviewapplication::*;
 
 

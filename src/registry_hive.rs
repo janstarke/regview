@@ -8,7 +8,7 @@ use rwinreg::hive::Hive;
 use rwinreg::nk::NodeKey;
 use rwinreg::vk::Data;
 
-use crate::table_line::TableLine;
+use crate::keys_line::KeysLine;
 
 pub struct RegistryHive {
     hive_file: File,
@@ -27,7 +27,7 @@ impl RegistryHive {
         })
     }
 
-    pub fn current_keys(&mut self) -> Result<Vec<TableLine>> {
+    pub fn current_keys(&mut self) -> Result<Vec<KeysLine>> {
         let mut keys = Vec::new();
 
         loop {
@@ -35,7 +35,9 @@ impl RegistryHive {
                 None => { break; }
                 Some(node) => node
             };
-            keys.push(TableLine::new(record.key_name()));
+            keys.push(KeysLine::new(
+                record.key_name(),
+                record.get_last_written()));
         }
         Ok(keys)
     }
