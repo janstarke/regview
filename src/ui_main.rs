@@ -4,14 +4,12 @@ use cursive::view::{Nameable, Resizable, SizeConstraint};
 use cursive::views::DummyView;
 use cursive::{views::{LinearLayout, ResizedView, Panel, TextView, ViewRef}, CursiveRunnable};
 use cursive_table_view::{TableView};
-use cursive::event::{EventTrigger, EventResult};
 use std::{cell::RefCell};
 
 use crate::registry_hive::RegistryHive;
 use crate::keys_line::*;
 use crate::values_line::*;
 
-static NAME_KEYS_PANE: &str = "keys_pane";
 static NAME_KEYS_TABLE: &str = "keys_table";
 static NAME_VALUES_TABLE: &str = "values_table";
 static NAME_PATH_LINE: &str = "path_line";
@@ -61,7 +59,7 @@ impl UIMain {
         }
     }
 
-    fn on_submit(siv: &mut Cursive, row: usize, index: usize) {
+    fn on_submit(siv: &mut Cursive, _: usize, index: usize) {
         let mut keys_table: ViewRef<TableView::<KeysLine, KeysColumn>> = siv.find_name(NAME_KEYS_TABLE).unwrap();
         let hive: &mut RegistryHive = siv.user_data().unwrap();
         let new_items = match keys_table.borrow_item(index) {
@@ -80,8 +78,8 @@ impl UIMain {
         siv.call_on_name(NAME_PATH_LINE, |l: &mut TextView| l.set_content(path));
     }
 
-    fn on_select(siv: &mut Cursive, row: usize, index: usize) {
-        let mut keys_table: ViewRef<TableView::<KeysLine, KeysColumn>> = siv.find_name(NAME_KEYS_TABLE).unwrap();
+    fn on_select(siv: &mut Cursive, _: usize, index: usize) {
+        let keys_table: ViewRef<TableView::<KeysLine, KeysColumn>> = siv.find_name(NAME_KEYS_TABLE).unwrap();
         let new_items = match keys_table.borrow_item(index) {
             None => { return },
             Some(item) => {
