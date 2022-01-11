@@ -12,9 +12,10 @@ pub enum KeysColumn {
 
 #[derive(Clone, Debug)]
 pub struct KeysLine {
-    record: Rc<RefCell<NodeKey>>,
+    record: Option<Rc<RefCell<NodeKey>>>,
     name: String,
     timestamp: WinTimestamp,
+    is_parent: bool
 }
 
 impl KeysLine {
@@ -22,12 +23,29 @@ impl KeysLine {
         let nk = Rc::new(RefCell::new(nk));
         let name = nk.borrow().key_name().to_owned();
         let timestamp = nk.borrow().get_last_written().clone();
-        
+
         Self {
-            record: nk,
+            record: Some(nk),
             name: name,
-            timestamp: timestamp
+            timestamp: timestamp,
+            is_parent: false
         }
+    }
+
+    pub fn parent() -> Self {
+        Self {
+            record: None,
+            name: "[..]".to_owned(),
+            timestamp: WinTimestamp::from(0),
+            is_parent: true
+        }
+    }
+    pub fn is_parent(&self) -> bool {
+        self.is_parent
+    }
+
+    pub fn record(&self) -> Rc<RefCell<NodeKey>> {
+        Rc::clone(&self.record.as_ref().unwrap())
     }
 }
 
@@ -35,7 +53,13 @@ impl TableViewItem<KeysColumn> for KeysLine {
     fn to_column(&self, column: KeysColumn) -> String {
         match column {
             KeysColumn::Name => self.name.to_owned(),
-            KeysColumn::LastWritten => self.timestamp.to_datetime().to_rfc3339()
+            KeysColumn::LastWritten => {
+                if self.is_parent {
+                    "".to_owned()
+                } else {
+                    self.timestamp.to_datetime().to_rfc3339()
+                }
+            }
         }
     }
 
@@ -43,9 +67,21 @@ impl TableViewItem<KeysColumn> for KeysLine {
     where
         Self: Sized,
     {
-        match column {
-            KeysColumn::Name => self.name.cmp(&other.name),
-            KeysColumn::LastWritten => self.timestamp.value().cmp(&other.timestamp.value())
+        if self.is_parent {
+            if other.is_parent {
+                std::cmp::Ordering::Equal
+            } else {
+                std::cmp::Ordering::Less
+            }
+        } else {
+            if other.is_parent {
+                std::cmp::Ordering::Greater
+            } else {
+                match column {
+                    KeysColumn::Name => self.name.cmp(&other.name),
+                    KeysColumn::LastWritten => self.timestamp.value().cmp(&other.timestamp.value())
+                }
+            }
         }
     }
 }

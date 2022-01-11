@@ -1,18 +1,21 @@
 use anyhow::Result;
+use cursive::Cursive;
 use cursive::view::{Nameable, Resizable, SizeConstraint};
 use cursive::views::DummyView;
-use cursive::{views::{LinearLayout, ResizedView, Panel, NamedView}, CursiveRunnable};
+use cursive::{views::{LinearLayout, ResizedView, Panel, NamedView, ViewRef}, CursiveRunnable};
 use cursive_table_view::{TableView};
+use cursive::event::{EventTrigger, EventResult};
 use std::{cell::RefCell};
 
 use crate::registry_hive::RegistryHive;
 use crate::keys_line::*;
 use crate::values_line::*;
 
+static NAME_KEYS_PANE: &str = "keys_pane";
+static NAME_KEYS_TABLE: &str = "keys_table";
 
 pub struct UIMain {
-    siv: RefCell<CursiveRunnable>,
-    hive: RefCell<RegistryHive>
+    siv: RefCell<CursiveRunnable>
 }
 
 impl UIMain {
@@ -20,10 +23,14 @@ impl UIMain {
         let mut siv = cursive::default();  
         siv.add_global_callback('q', |s| s.quit());
 
-        let table = NamedView::new("keys_table", TableView::<KeysLine, KeysColumn>::new()
+        let mut keys_table = TableView::<KeysLine, KeysColumn>::new()
             .column(KeysColumn::Name, "Name", |c| {c})
             .column(KeysColumn::LastWritten, "Last written", |c| c.width(25))
-        );
+            ;
+
+        keys_table.set_on_submit(UIMain::on_submit);
+       
+        let table = NamedView::new(NAME_KEYS_TABLE, keys_table);
 
         let mut details_table = TableView::<ValuesLine, ValuesColumn>::new()
             .column(ValuesColumn::Name, "Name", |c| c.width_percent(100));
@@ -46,14 +53,36 @@ impl UIMain {
             root_view
         )).title(format!("{} v{}", env!("CARGO_PKG_NAME"), env!("CARGO_PKG_VERSION"))));
 
+        siv.set_user_data(hive);
         Self {
-            siv: RefCell::new(siv),
-            hive: RefCell::new(hive)
+            siv: RefCell::new(siv)
         }
     }
 
+    fn on_submit(siv: &mut Cursive, row: usize, index: usize) {
+        let mut keys_table: ViewRef<TableView::<KeysLine, KeysColumn>> = siv.find_name(NAME_KEYS_TABLE).unwrap();
+        let new_items = match keys_table.borrow_item(index) {
+            None => { return },
+            Some(item) => {
+                let hive: &mut RegistryHive = siv.user_data().unwrap();
+                if item.is_parent() {
+                    hive.parent_keys().unwrap()
+                } else {
+                    hive.child_keys(item.record()).unwrap()
+                }
+            }
+        };
+        keys_table.clear();
+        keys_table.set_items(new_items);
+    }
+
     pub fn run(&self) -> Result<()> {
-        self.siv.borrow_mut().call_on_name("keys_table", |v: &mut TableView<KeysLine, KeysColumn>| v.set_items(self.hive.borrow_mut().current_keys().unwrap()));
+        let items = {
+            let mut siv = self.siv.borrow_mut();
+            let hive: &mut RegistryHive = siv.user_data().unwrap();
+            hive.current_keys()?
+        };
+        self.siv.borrow_mut().call_on_name(NAME_KEYS_TABLE, |v: &mut TableView<KeysLine, KeysColumn>| v.set_items(items));
         self.siv.borrow_mut().run();
         Ok(())
 
