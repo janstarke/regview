@@ -1,5 +1,8 @@
 use cursive_table_view::TableViewItem;
 use winstructs::timestamp::WinTimestamp;
+use rwinreg::nk::NodeKey;
+use std::rc::Rc;
+use std::cell::RefCell;
 
 #[derive(Copy, Clone, PartialEq, Eq, Hash)]
 pub enum KeysColumn {
@@ -9,15 +12,21 @@ pub enum KeysColumn {
 
 #[derive(Clone, Debug)]
 pub struct KeysLine {
+    record: Rc<RefCell<NodeKey>>,
     name: String,
     timestamp: WinTimestamp,
 }
 
 impl KeysLine {
-    pub fn new(name: &str, timestamp: &WinTimestamp) -> Self {
+    pub fn from(nk: NodeKey) -> Self {
+        let nk = Rc::new(RefCell::new(nk));
+        let name = nk.borrow().key_name().to_owned();
+        let timestamp = nk.borrow().get_last_written().clone();
+        
         Self {
-            name: name.to_owned(),
-            timestamp: timestamp.clone()
+            record: nk,
+            name: name,
+            timestamp: timestamp
         }
     }
 }

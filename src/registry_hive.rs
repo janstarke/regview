@@ -35,9 +35,7 @@ impl RegistryHive {
                 None => { break; }
                 Some(node) => node
             };
-            keys.push(KeysLine::new(
-                record.key_name(),
-                record.get_last_written()));
+            keys.push(KeysLine::from(record));
         }
         Ok(keys)
     }

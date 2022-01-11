@@ -1,8 +1,8 @@
 use anyhow::Result;
 use cursive::view::{Nameable, Resizable, SizeConstraint};
 use cursive::views::DummyView;
-use cursive::{views::{LinearLayout, ResizedView, Panel, NamedView}, CursiveRunnable, theme::BaseColor};
-use cursive_table_view::{TableView, TableViewItem};
+use cursive::{views::{LinearLayout, ResizedView, Panel, NamedView}, CursiveRunnable};
+use cursive_table_view::{TableView};
 use std::{cell::RefCell};
 
 use crate::registry_hive::RegistryHive;
@@ -20,7 +20,7 @@ impl UIMain {
         let mut siv = cursive::default();  
         siv.add_global_callback('q', |s| s.quit());
 
-        let mut table = NamedView::new("keys_table", TableView::<KeysLine, KeysColumn>::new()
+        let table = NamedView::new("keys_table", TableView::<KeysLine, KeysColumn>::new()
             .column(KeysColumn::Name, "Name", |c| {c})
             .column(KeysColumn::LastWritten, "Last written", |c| c.width(25))
         );
@@ -28,7 +28,7 @@ impl UIMain {
         let mut details_table = TableView::<ValuesLine, ValuesColumn>::new()
             .column(ValuesColumn::Name, "Name", |c| c.width_percent(100));
 
-        let mut items = vec![
+        let items = vec![
             ValuesLine::new("Details1"), 
             ValuesLine::new("Details2"),
             ValuesLine::new("Details3")];
