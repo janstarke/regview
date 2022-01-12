@@ -21,10 +21,10 @@ impl ValuesLine {
     pub fn from(value: &ValueKey) -> Result<Self> {
         let data =
             match value.decode_data()? {
-                None => "NONE".to_owned(),
+                None => format!("{:?}", value.get_raw_data()),
                 Some(data) => {
                     match data {
-                        Data::None => "NONE".to_owned(),
+                        Data::None => format!("{:?}", data),
                         Data::String(s) => s,
                         Data::Int32(i) => i.to_string(),
 

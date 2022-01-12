@@ -16,5 +16,5 @@ log = "0.4"
 cursive = "0.16"
 cursive-aligned-view = "^0"
 cursive_table_view = "0.13"
-rwinreg = { git = "https://github.com/janstarke/r-winreg.git", branch="feature/regview", version="0.2.0-janstarke.4" }
+rwinreg = { git = "https://github.com/janstarke/r-winreg.git", branch="feature/regview", version="0.2.0-janstarke.5" }
 winstructs = {git = "https://github.com/janstarke/winstructs", branch="feature/serialize", version="0.3.1-alpha.0-janstarke.1"}
