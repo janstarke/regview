@@ -1,5 +1,5 @@
 use anyhow::Result;
-use cursive::Cursive;
+use cursive::{Cursive, With};
 use cursive::view::{Nameable, Resizable, SizeConstraint};
 use cursive::views::DummyView;
 use cursive::{views::{LinearLayout, ResizedView, Panel, TextView, ViewRef}, CursiveRunnable};
@@ -26,7 +26,7 @@ impl UIMain {
 
         let mut keys_table = TableView::<KeysLine, KeysColumn>::new()
             .column(KeysColumn::Name, "Name", |c| {c})
-            .column(KeysColumn::LastWritten, "Last written", |c| c.width(25));
+            .column(KeysColumn::LastWritten, "Last written", |c| c.width(20));
 
         keys_table.set_on_submit(UIMain::on_submit);
         keys_table.set_on_select(UIMain::on_select);
@@ -40,7 +40,7 @@ impl UIMain {
         //details_table.set_enabled(false);
 
         let reg_view = LinearLayout::horizontal()
-            .child(keys_table.with_name(NAME_KEYS_TABLE).full_screen())
+            .child(keys_table.with_name(NAME_KEYS_TABLE).full_height().min_width(48).max_width(64))
             .child(DummyView)
             .child(details_table.with_name(NAME_VALUES_TABLE).full_screen());
 

@@ -57,7 +57,7 @@ impl TableViewItem<KeysColumn> for KeysLine {
                 if self.is_parent {
                     "".to_owned()
                 } else {
-                    self.timestamp.to_datetime().to_rfc3339()
+                    format!("{}", self.timestamp.to_datetime().format("%FT%T"))
                 }
             }
         }
