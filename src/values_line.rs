@@ -19,22 +19,23 @@ pub struct ValuesLine {
 
 impl ValuesLine {
     pub fn from(value: &ValueKey) -> Result<Self> {
-        let (data, datatype) =
+        let data =
             match value.decode_data()? {
-                None => { ("NONE".to_owned(), "".to_owned()) }
+                None => "NONE".to_owned(),
                 Some(data) => {
                     match data {
-                        Data::None => ("NONE".to_owned(), "NONE".to_owned()),
-                        Data::String(s) => (s, "String".to_owned()),
-                        Data::Int32(i) => (i.to_string(), "Int32".to_owned())
+                        Data::None => "NONE".to_owned(),
+                        Data::String(s) => s,
+                        Data::Int32(i) => i.to_string(),
 
                     }
                 }
             };
+
         Ok(Self {
             name: value.get_name().to_owned(),
             data: data,
-            datatype: datatype
+            datatype: value.get_data_type().as_string()
         })
     }
 }

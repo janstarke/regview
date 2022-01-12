@@ -1,7 +1,11 @@
 use std::fs::File;
-use std::cell::{RefCell, RefMut};
+use std::cell::{RefCell, Ref};
+use std::ops::Add;
 use std::rc::Rc;
 use anyhow::Result;
+use std::hash::{Hash, Hasher};
+use std::collections::HashMap;
+use std::collections::hash_map::DefaultHasher;
 
 use rwinreg::hive::Hive;
 use rwinreg::nk::NodeKey;
@@ -14,7 +18,9 @@ pub struct RegistryHive {
     hive_file: File,
     root: Rc<RefCell<NodeKey>>,
     path: Vec<Rc<RefCell<NodeKey>>>,
-    visible_path: Vec<String>
+    visible_path: Vec<String>,
+
+    values_cache: HashMap<u64, Rc<Vec<ValuesLine>>>
 }
 
 impl RegistryHive {
@@ -25,7 +31,8 @@ impl RegistryHive {
             hive_file: hive_file,
             root: Rc::new(RefCell::new(root)),
             path: Vec::new(),
-            visible_path: Vec::new()
+            visible_path: Vec::new(),
+            values_cache: HashMap::new(),
         })
     }
 
@@ -69,16 +76,31 @@ impl RegistryHive {
     }
 
 
-    pub fn key_values(&mut self, record: Rc<RefCell<NodeKey>>) -> Result<Vec<ValuesLine>> {
-        let mut values = Vec::new();
-        loop {
-            let value = match record.borrow_mut().get_next_value(&mut self.hive_file)? {
-                None => {break;}
-                Some(node) => node
-            };
+    pub fn key_values(&mut self, record: Rc<RefCell<NodeKey>>) -> Result<Rc<Vec<ValuesLine>>> {
+        let record_hash = Self::hash_of(record.borrow());
+        match self.values_cache.get(&record_hash) {
+            Some(values) => Ok(Rc::clone(values)),
+            None => {
+                let mut values = Vec::new();
+                loop {
+                    let value = match record.borrow_mut().get_next_value(&mut self.hive_file)? {
+                        None => {break;}
+                        Some(node) => node
+                    };
+        
+                    values.push(ValuesLine::from(&value)?);
+                }
+                let values = Rc::new(values);
+                self.values_cache.insert(record_hash, Rc::clone(&values));
+                Ok(values)
 
-            values.push(ValuesLine::from(&value)?);
+            }
         }
-        Ok(values)
+    }
+
+    fn hash_of<T>(v: Ref<T>) -> u64 where T: Hash{
+        let mut hasher = DefaultHasher::new();
+        v.hash(&mut hasher);
+        hasher.finish()
     }
 }

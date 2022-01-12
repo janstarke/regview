@@ -5,6 +5,7 @@ use cursive::views::DummyView;
 use cursive::{views::{LinearLayout, ResizedView, Panel, TextView, ViewRef}, CursiveRunnable};
 use cursive_table_view::{TableView};
 use std::{cell::RefCell};
+use std::rc::Rc;
 
 use crate::registry_hive::RegistryHive;
 use crate::keys_line::*;
@@ -30,12 +31,13 @@ impl UIMain {
         keys_table.set_on_submit(UIMain::on_submit);
         keys_table.set_on_select(UIMain::on_select);
 
-        let mut details_table = TableView::<ValuesLine, ValuesColumn>::new()
+        let details_table = TableView::<ValuesLine, ValuesColumn>::new()
             .column(ValuesColumn::Name, "Name", |c| {c})
-            .column(ValuesColumn::Data, "Value", |c| {c.width(8)})
-            .column(ValuesColumn::Type, "Datatype", |c| {c});
+            .column(ValuesColumn::Data, "Value", |c| {c})
+            .column(ValuesColumn::Type, "Datatype", |c| {c.width(16)})
+        ;
 
-        details_table.set_enabled(false);
+        //details_table.set_enabled(false);
 
         let reg_view = LinearLayout::horizontal()
             .child(keys_table.with_name(NAME_KEYS_TABLE).full_screen())
@@ -84,7 +86,7 @@ impl UIMain {
             None => { return },
             Some(item) => {
                 if item.is_parent() {
-                    Vec::new()
+                    Rc::new(Vec::new())
                 } else {
                     let hive: &mut RegistryHive = siv.user_data().unwrap();
                     hive.key_values(item.record()).unwrap()
@@ -94,7 +96,7 @@ impl UIMain {
 
         let mut values_table: ViewRef<TableView::<ValuesLine, ValuesColumn>> = siv.find_name(NAME_VALUES_TABLE).unwrap();
         values_table.clear();
-        values_table.set_items(new_items);
+        values_table.set_items((*new_items).clone());
     }
 
     pub fn run(&self) -> Result<()> {
