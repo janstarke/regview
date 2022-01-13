@@ -2,12 +2,14 @@ use clap::{App, Arg};
 use anyhow::Result;
 use std::path::PathBuf;
 use std::fs::File;
+use std::rc::Rc;
+use std::cell::RefCell;
 
 use crate::ui_main::*;
 use crate::registry_hive::*;
 
 pub struct RegViewApplication {
-    hive: RegistryHive,
+    hive: Rc<RefCell<RegistryHive>>,
 }
 
 impl RegViewApplication {
@@ -16,7 +18,7 @@ impl RegViewApplication {
     }
 
     pub fn run(mut self) -> Result<()> {
-        let ui = UIMain::new(self.hive);
+        let mut ui = UIMain::new(self.hive);
         ui.run()
     }
 
@@ -43,7 +45,7 @@ impl RegViewApplication {
             File::open(fp)?
         };
         Ok(Self {
-            hive: RegistryHive::new(reg_file)?
+            hive: Rc::new(RefCell::new(RegistryHive::new(reg_file)?))
         })
     }
 }

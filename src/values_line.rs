@@ -1,7 +1,10 @@
+use std::fmt::Binary;
+
 use cursive_table_view::TableViewItem;
-use rwinreg::vk::ValueKey;
-use rwinreg::vk::Data;
 use anyhow::Result;
+use nt_hive::{Hive, KeyNode, KeyValue};
+
+use crate::mmap_byteslice::MmapByteSlice;
 
 #[derive(Copy, Clone, PartialEq, Eq, Hash)]
 pub enum ValuesColumn {
@@ -18,24 +21,27 @@ pub struct ValuesLine {
 }
 
 impl ValuesLine {
-    pub fn from(value: &ValueKey) -> Result<Self> {
-        let data =
-            match value.decode_data()? {
-                None => format!("{:?}", value.get_raw_data()),
-                Some(data) => {
-                    match data {
-                        Data::None => format!("{:?}", data),
-                        Data::String(s) => s,
-                        Data::Int32(i) => i.to_string(),
-
-                    }
-                }
-            };
+    pub fn from(value: &KeyValue<&Hive<MmapByteSlice>, MmapByteSlice>) -> Result<Self> {
+        let (datatype, data) = 
+        match value.data_type() {
+            RegNone => ("RegNone", "".to_owned()),
+            RegSZ=> ("RegSZ", value.string_data()?),
+            RegExpandSZ=> ("RegExpandSZ", value.string_data()?),
+            RegBinary=> ("RegBinary", "not supported".to_owned()),
+            RegDWord=> ("RegDWord", format!("0x{:08x}", value.dword_data()?)),
+            RegDWordBigEndian=> ("RegDWordBigEndian", format!("0x{:08X}", u32::from_be(value.dword_data()?))),
+            RegLink=> ("RegLink", "not supported".to_owned()),
+            RegMultiSZ=> ("RegMultiSZ", value.multi_string_data()?.join("|")),
+            RegResourceList=> ("RegResourceList", "not supported".to_owned()),
+            RegFullResourceDescriptor=> ("RegFullResourceDescriptor", "not supported".to_owned()),
+            RegResourceRequirementsList=> ("RegResourceRequirementsList", "not supported".to_owned()),
+            RegQWord=> ("RegQWord", format!("0x{:016x}", value.qword_data()?)),
+        };
 
         Ok(Self {
-            name: value.get_name().to_owned(),
-            data: data,
-            datatype: value.get_data_type().as_string()
+            name: value.name()?.to_string_lossy(),
+            data,
+            datatype: datatype.to_owned()
         })
     }
 }

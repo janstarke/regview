@@ -1,8 +1,10 @@
 use cursive_table_view::TableViewItem;
-use winstructs::timestamp::WinTimestamp;
-use rwinreg::nk::NodeKey;
 use std::rc::Rc;
 use std::cell::RefCell;
+use nt_hive::{Hive, KeyNode};
+use anyhow::Result;
+
+use crate::mmap_byteslice::MmapByteSlice;
 
 #[derive(Copy, Clone, PartialEq, Eq, Hash)]
 pub enum KeysColumn {
@@ -10,42 +12,44 @@ pub enum KeysColumn {
     LastWritten
 }
 
-#[derive(Clone, Debug)]
+#[derive(Clone)]
 pub struct KeysLine {
-    record: Option<Rc<RefCell<NodeKey>>>,
     name: String,
-    timestamp: WinTimestamp,
     is_parent: bool
 }
 
 impl KeysLine {
-    pub fn from(nk: NodeKey) -> Self {
+    pub fn from(nk: KeyNode<&Hive<MmapByteSlice>, MmapByteSlice>) -> Result<Self> {
         let nk = Rc::new(RefCell::new(nk));
-        let name = nk.borrow().key_name().to_owned();
-        let timestamp = nk.borrow().get_last_written().clone();
+        let name = nk.borrow().name()?.to_string_lossy();
+        //let timestamp = nk.borrow().get_last_written().clone();
 
-        Self {
-            record: Some(nk),
+        Ok(Self {
+            //record: Some(nk),
             name: name,
-            timestamp: timestamp,
             is_parent: false
-        }
+        })
     }
 
     pub fn parent() -> Self {
         Self {
-            record: None,
+            //record: None,
             name: "[..]".to_owned(),
-            timestamp: WinTimestamp::from(0),
+            //timestamp: WinTimestamp::from(0),
             is_parent: true
         }
     }
     pub fn is_parent(&self) -> bool {
         self.is_parent
     }
-
-    pub fn record(&self) -> Rc<RefCell<NodeKey>> {
+/*
+    pub fn record(&self) -> Rc<RefCell<KeyNode<&'a Hive<&'a [u8]>, &'a [u8]>>> {
         Rc::clone(&self.record.as_ref().unwrap())
+    }
+    */
+
+    pub fn name(&self) -> &str {
+        &self.name
     }
 }
 
@@ -53,13 +57,7 @@ impl TableViewItem<KeysColumn> for KeysLine {
     fn to_column(&self, column: KeysColumn) -> String {
         match column {
             KeysColumn::Name => self.name.to_owned(),
-            KeysColumn::LastWritten => {
-                if self.is_parent {
-                    "".to_owned()
-                } else {
-                    format!("{}", self.timestamp.to_datetime().format("%FT%T"))
-                }
-            }
+            KeysColumn::LastWritten => { panic!("not supported"); }
         }
     }
 
@@ -79,7 +77,7 @@ impl TableViewItem<KeysColumn> for KeysLine {
             } else {
                 match column {
                     KeysColumn::Name => self.name.cmp(&other.name),
-                    KeysColumn::LastWritten => self.timestamp.value().cmp(&other.timestamp.value())
+                    KeysColumn::LastWritten => { panic!("not supported"); }
                 }
             }
         }
