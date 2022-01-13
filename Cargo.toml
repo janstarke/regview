@@ -16,5 +16,6 @@ log = "0.4"
 cursive = "0.16"
 cursive_table_view = "0.13"
 memmap = "0.7"
+cursive-flexi-logger-view = "^0"
 nt-hive = {path="../nt-hive", version="0.2.1"}
 zerocopy = {path="../zerocopy-0.6.1", version="0.6.2"}

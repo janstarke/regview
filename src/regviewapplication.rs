@@ -17,7 +17,7 @@ impl RegViewApplication {
         Self::parse_options()
     }
 
-    pub fn run(mut self) -> Result<()> {
+    pub fn run(self) -> Result<()> {
         let mut ui = UIMain::new(self.hive);
         ui.run()
     }
