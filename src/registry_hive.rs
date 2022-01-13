@@ -140,10 +140,10 @@ impl RegistryHive {
         if result.is_some() {
             return Ok(result);
         }
-        Ok(SearchResult::None)
+        self.find_in_siblings(&mut search_path, &current_node, &regex)
     }
 
-    pub fn find_in_siblings(&self, current_path: &mut Vec<String>, current_node: &KeyNode<&Hive<MmapByteSlice>, MmapByteSlice>, search_regex: &Regex) -> Result<SearchResult> {
+    fn find_in_siblings(&self, current_path: &mut Vec<String>, current_node: &KeyNode<&Hive<MmapByteSlice>, MmapByteSlice>, search_regex: &Regex) -> Result<SearchResult> {
         let root = self.hive.root_key_node()?;
         match current_path.pop() {
             None => {
@@ -168,6 +168,11 @@ impl RegistryHive {
                                             if result.is_some() {
                                                 return Ok(result);
                                             }
+
+                                            let result = self.find_in_subkeys(current_path, &subkey, search_regex)?;
+                                            if result.is_some() {
+                                                return Ok(result);
+                                            }
                                         } else {
                                             if subkey.name()? == current_node.name()? {
                                                 found_current_node = true;
@@ -186,7 +191,7 @@ impl RegistryHive {
         Ok(SearchResult::None)
     }
 
-    pub fn find_in_this_node(&self, current_path: &mut Vec<String>, current_node: &KeyNode<&Hive<MmapByteSlice>, MmapByteSlice>, search_regex: &Regex) -> Result<SearchResult> {
+    fn find_in_this_node(&self, current_path: &mut Vec<String>, current_node: &KeyNode<&Hive<MmapByteSlice>, MmapByteSlice>, search_regex: &Regex) -> Result<SearchResult> {
         let subkey_name = current_node.name()?.to_string_lossy();
         
         /*
@@ -211,7 +216,7 @@ impl RegistryHive {
         Ok(SearchResult::None)
     }
 
-    pub fn find_in_subkeys(&self, current_path: &mut Vec<String>, current_node: &KeyNode<&Hive<MmapByteSlice>, MmapByteSlice>, search_regex: &Regex) -> Result<SearchResult> {
+    fn find_in_subkeys(&self, current_path: &mut Vec<String>, current_node: &KeyNode<&Hive<MmapByteSlice>, MmapByteSlice>, search_regex: &Regex) -> Result<SearchResult> {
         if let Some(subkeys_result) = current_node.subkeys() {
             match subkeys_result {
                 Err(why) => {return Err(anyhow!(why));}
@@ -233,7 +238,7 @@ impl RegistryHive {
         Ok(SearchResult::None)
     }
 
-    pub fn find_in_attributes(&self, current_path: &mut Vec<String>, current_node: &KeyNode<&Hive<MmapByteSlice>, MmapByteSlice>, search_regex: &Regex) -> Result<SearchResult> {
+    fn find_in_attributes(&self, current_path: &mut Vec<String>, current_node: &KeyNode<&Hive<MmapByteSlice>, MmapByteSlice>, search_regex: &Regex) -> Result<SearchResult> {
         if let Some(values_result) = current_node.values() {
             match values_result {
                 Err(why) => {return Err(anyhow!(why));}
