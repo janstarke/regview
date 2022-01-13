@@ -35,10 +35,13 @@ impl UIMain {
     pub fn new(hive: Rc<RefCell<RegistryHive>>) -> Self {
         let mut siv = cursive::default();
 
-        siv.set_user_data(Rc::clone(&hive));
+        let user_data = RegviewUserdata {
+            hive,
+            search_regex: None
+        };
+        siv.set_user_data(user_data);
         let mut me = Self { siv: siv };
         me.construct();
-        assert!(me.siv.user_data::<Rc<RefCell<RegistryHive>>>().is_some());
         me
     }
 
@@ -126,8 +129,8 @@ impl UIMain {
     fn on_submit(siv: &mut Cursive, _: usize, index: usize) {
         let mut keys_table: ViewRef<TableView<KeysLine, KeysColumn>> =
             siv.find_name(NAME_KEYS_TABLE).unwrap();
-            
-        let hive: &Rc<RefCell<RegistryHive>> = siv.user_data().unwrap();
+        let user_data: &RegviewUserdata = siv.user_data().unwrap();
+        let hive = &user_data.hive;
         let selected_node = hive.borrow().selected_node();
         let mut select_node = selected_node.is_some();
         let new_items = match keys_table.borrow_item(index) {
@@ -173,7 +176,8 @@ impl UIMain {
                 if item.is_parent() {
                     vec![ValuesLine::new("parent key".to_owned(), "".to_owned(), "".to_owned())]
                 } else {
-                    let hive: &Rc<RefCell<RegistryHive>> = siv.user_data().unwrap();
+                    let user_data: &RegviewUserdata = siv.user_data().unwrap();
+                    let hive = &user_data.hive;
                     hive.borrow().key_values(item.name()).unwrap()
                 }
             }
@@ -187,7 +191,8 @@ impl UIMain {
 
     pub fn run(&mut self) -> Result<()> {
         let items = {
-            let hive: &Rc<RefCell<RegistryHive>> = self.siv.user_data().unwrap();
+            let user_data: &RegviewUserdata = self.siv.user_data().unwrap();
+            let hive = &user_data.hive;
             hive.borrow().current_keys()?
         };
         self.siv.call_on_name(
