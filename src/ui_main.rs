@@ -74,18 +74,34 @@ impl UIMain {
     fn on_submit(siv: &mut Cursive, _: usize, index: usize) {
         let mut keys_table: ViewRef<TableView::<KeysLine, KeysColumn>> = siv.find_name(NAME_KEYS_TABLE).unwrap();
         let hive: &Rc<RefCell<RegistryHive>> = siv.user_data().unwrap();
+        let mut selected_node = hive.borrow().selected_node();
+        let mut select_node = selected_node.is_some();
         let new_items = match keys_table.borrow_item(index) {
             None => { return },
             Some(item) => {
                 if item.is_parent() {
+                    select_node = select_node & true;
                     hive.borrow_mut().leave().unwrap()
                 } else {
                     hive.borrow_mut().enter(item.name()).unwrap()
                 }
             }
         };
+        
         keys_table.clear();
+        let selection_index = 
+        if select_node {
+            new_items.iter().position(|i| i.name() == selected_node.as_ref().unwrap())
+        } else {
+            None
+        };
+
         keys_table.set_items(new_items);
+        if let Some(index) = selection_index {
+            keys_table.set_selected_item(index);
+        }
+        keys_table.sort();
+
         let path = hive.borrow().path();
         siv.call_on_name(NAME_PATH_LINE, |l: &mut TextView| l.set_content(path));
     }
@@ -96,7 +112,7 @@ impl UIMain {
         let new_items = match keys_table.borrow_item(index) {
             None => {
                 log::warn!("found no values for this item");
-                return;
+                Vec::new()
             },
             Some(item) => {
                 if item.is_parent() {

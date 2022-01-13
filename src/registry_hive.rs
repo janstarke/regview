@@ -75,6 +75,10 @@ impl RegistryHive {
         self.current_keys()
     }
 
+    pub fn selected_node(&self) -> Option<String> {
+        self.path.last().and_then(|s|Some(s.to_owned()))
+    }
+
     pub fn key_values(&self, record_name: &str) -> Result<Vec<ValuesLine>> {
         
         let mut value_list = Vec::new();

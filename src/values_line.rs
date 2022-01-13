@@ -1,8 +1,6 @@
-use std::fmt::Binary;
-
 use cursive_table_view::TableViewItem;
 use anyhow::Result;
-use nt_hive::{Hive, KeyNode, KeyValue};
+use nt_hive::{Hive, KeyValue, KeyValueDataType};
 
 use crate::mmap_byteslice::MmapByteSlice;
 
@@ -23,19 +21,19 @@ pub struct ValuesLine {
 impl ValuesLine {
     pub fn from(value: &KeyValue<&Hive<MmapByteSlice>, MmapByteSlice>) -> Result<Self> {
         let (datatype, data) = 
-        match value.data_type() {
-            RegNone => ("RegNone", "".to_owned()),
-            RegSZ=> ("RegSZ", value.string_data()?),
-            RegExpandSZ=> ("RegExpandSZ", value.string_data()?),
-            RegBinary=> ("RegBinary", "not supported".to_owned()),
-            RegDWord=> ("RegDWord", format!("0x{:08x}", value.dword_data()?)),
-            RegDWordBigEndian=> ("RegDWordBigEndian", format!("0x{:08X}", u32::from_be(value.dword_data()?))),
-            RegLink=> ("RegLink", "not supported".to_owned()),
-            RegMultiSZ=> ("RegMultiSZ", value.multi_string_data()?.join("|")),
-            RegResourceList=> ("RegResourceList", "not supported".to_owned()),
-            RegFullResourceDescriptor=> ("RegFullResourceDescriptor", "not supported".to_owned()),
-            RegResourceRequirementsList=> ("RegResourceRequirementsList", "not supported".to_owned()),
-            RegQWord=> ("RegQWord", format!("0x{:016x}", value.qword_data()?)),
+        match value.data_type()? {
+            KeyValueDataType::RegNone => ("RegNone", "".to_owned()),
+            KeyValueDataType::RegSZ=> ("RegSZ", value.string_data()?),
+            KeyValueDataType::RegExpandSZ=> ("RegExpandSZ", value.string_data()?),
+            KeyValueDataType::RegBinary=> ("RegBinary", "not supported".to_owned()),
+            KeyValueDataType::RegDWord=> ("RegDWord", format!("0x{:08x}", value.dword_data()?)),
+            KeyValueDataType::RegDWordBigEndian=> ("RegDWordBigEndian", format!("0x{:08X}", u32::from_be(value.dword_data()?))),
+            KeyValueDataType::RegLink=> ("RegLink", "not supported".to_owned()),
+            KeyValueDataType::RegMultiSZ=> ("RegMultiSZ", value.multi_string_data()?.join("|")),
+            KeyValueDataType::RegResourceList=> ("RegResourceList", "not supported".to_owned()),
+            KeyValueDataType::RegFullResourceDescriptor=> ("RegFullResourceDescriptor", "not supported".to_owned()),
+            KeyValueDataType::RegResourceRequirementsList=> ("RegResourceRequirementsList", "not supported".to_owned()),
+            KeyValueDataType::RegQWord=> ("RegQWord", format!("0x{:016x}", value.qword_data()?)),
         };
 
         Ok(Self {
