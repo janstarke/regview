@@ -3,7 +3,7 @@ use cursive::view::{Nameable, Resizable, SizeConstraint};
 use cursive::views::{DebugView, DummyView};
 use cursive::Cursive;
 use cursive::{
-    views::{LinearLayout, Panel, ResizedView, TextView, ViewRef},
+    views::{LinearLayout, Panel, ResizedView, TextView, ViewRef, Dialog, EditView},
     CursiveRunnable,
 };
 use cursive::event;
@@ -20,9 +20,15 @@ static NAME_KEYS_TABLE: &str = "keys_table";
 static NAME_VALUES_TABLE: &str = "values_table";
 static NAME_PATH_LINE: &str = "path_line";
 static NAME_DEBUG_VIEW: &str = "debug_view";
+static NAME_SEARCH_REGEX: &str = "search_regex";
 
 pub struct UIMain {
     siv: CursiveRunnable,
+}
+
+struct RegviewUserdata {
+    hive: Rc<RefCell<RegistryHive>>,
+    search_regex: Option<String>
 }
 
 impl UIMain {
@@ -103,7 +109,18 @@ impl UIMain {
     }
 
     fn on_find(siv: &mut Cursive) {
+        let mut find_dialog = Dialog::around(LinearLayout::vertical()
+            .child(LinearLayout::horizontal()
+                .child(TextView::new("Search regex:"))
+                .child(EditView::new().min_width(32).with_name(NAME_SEARCH_REGEX))
+            )
+        );
+        find_dialog.add_button("Find", |s| {s.pop_layer();});
+        find_dialog.add_button("Cancel", |s| {
+            s.pop_layer();
 
+        });
+        siv.add_layer(find_dialog);
     }
 
     fn on_submit(siv: &mut Cursive, _: usize, index: usize) {
