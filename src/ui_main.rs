@@ -6,7 +6,6 @@ use cursive::{
     views::{LinearLayout, Panel, ResizedView, TextView, ViewRef},
     CursiveRunnable,
 };
-use cursive_flexi_logger_view::FlexiLoggerView;
 use cursive_table_view::TableView;
 use std::cell::RefCell;
 use std::rc::Rc;
@@ -47,7 +46,7 @@ impl UIMain {
         keys_table.set_on_select(UIMain::on_select);
 
         let details_table = TableView::<ValuesLine, ValuesColumn>::new()
-            .column(ValuesColumn::Name, "Name", |c| c)
+            .column(ValuesColumn::Name, "Name", |c| c.width(24))
             .column(ValuesColumn::Data, "Value", |c| c)
             .column(ValuesColumn::Type, "Datatype", |c| c.width(16));
 
@@ -68,11 +67,9 @@ impl UIMain {
 
         let root_view = LinearLayout::vertical()
             .child(TextView::new("").with_name(NAME_PATH_LINE))
-            .child(DummyView)
             .child(reg_view)
-            .child(DummyView)
             .child(Panel::new(
-                FlexiLoggerView::scrollable()
+                DebugView::new()
                     .with_name(NAME_DEBUG_VIEW)
                     .min_height(3)
                     .max_height(10),
@@ -95,8 +92,9 @@ impl UIMain {
     fn on_submit(siv: &mut Cursive, _: usize, index: usize) {
         let mut keys_table: ViewRef<TableView<KeysLine, KeysColumn>> =
             siv.find_name(NAME_KEYS_TABLE).unwrap();
+            
         let hive: &Rc<RefCell<RegistryHive>> = siv.user_data().unwrap();
-        let mut selected_node = hive.borrow().selected_node();
+        let selected_node = hive.borrow().selected_node();
         let mut select_node = selected_node.is_some();
         let new_items = match keys_table.borrow_item(index) {
             None => return,
@@ -135,12 +133,11 @@ impl UIMain {
 
         let new_items = match keys_table.borrow_item(index) {
             None => {
-                log::warn!("found no values for this item");
                 Vec::new()
             }
             Some(item) => {
                 if item.is_parent() {
-                    Vec::new()
+                    vec![ValuesLine::new("parent key".to_owned(), "".to_owned(), "".to_owned())]
                 } else {
                     let hive: &Rc<RefCell<RegistryHive>> = siv.user_data().unwrap();
                     hive.borrow().key_values(item.name()).unwrap()

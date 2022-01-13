@@ -83,7 +83,7 @@ impl RegistryHive {
         
         let mut value_list = Vec::new();
         let root = self.hive.root_key_node()?;
-        let current_node = root.subpath(&self.path()).unwrap()?;
+        let current_node = root.subpath(&(self.path() + "\\" + record_name)).unwrap()?;
         if let Some(values_result) = current_node.values() {
             match values_result {
                 Err(why) => {return Err(anyhow!(why));}

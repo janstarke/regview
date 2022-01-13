@@ -1,6 +1,6 @@
 use cursive_table_view::TableViewItem;
 use anyhow::Result;
-use nt_hive::{Hive, KeyValue, KeyValueDataType};
+use nt_hive::{Hive, KeyValue, KeyValueData, KeyValueDataType};
 
 use crate::mmap_byteslice::MmapByteSlice;
 
@@ -18,6 +18,13 @@ pub struct ValuesLine {
     datatype: String
 }
 
+fn binary_data(data: &KeyValue<&Hive<MmapByteSlice>, MmapByteSlice>) -> String {
+    match data.data().unwrap() {
+        KeyValueData::Small(v) => format!("{:X?}", v),
+        KeyValueData::Big(_) => "BigDataSlices unsupported".to_owned()
+    }
+}
+
 impl ValuesLine {
     pub fn from(value: &KeyValue<&Hive<MmapByteSlice>, MmapByteSlice>) -> Result<Self> {
         let (datatype, data) = 
@@ -25,7 +32,7 @@ impl ValuesLine {
             KeyValueDataType::RegNone => ("RegNone", "".to_owned()),
             KeyValueDataType::RegSZ=> ("RegSZ", value.string_data()?),
             KeyValueDataType::RegExpandSZ=> ("RegExpandSZ", value.string_data()?),
-            KeyValueDataType::RegBinary=> ("RegBinary", "not supported".to_owned()),
+            KeyValueDataType::RegBinary=> ("RegBinary", binary_data(value)),
             KeyValueDataType::RegDWord=> ("RegDWord", format!("0x{:08x}", value.dword_data()?)),
             KeyValueDataType::RegDWordBigEndian=> ("RegDWordBigEndian", format!("0x{:08X}", u32::from_be(value.dword_data()?))),
             KeyValueDataType::RegLink=> ("RegLink", "not supported".to_owned()),
@@ -41,6 +48,12 @@ impl ValuesLine {
             data,
             datatype: datatype.to_owned()
         })
+    }
+
+    pub fn new(name: String, data: String, datatype: String) -> Self {
+        Self {
+            name, data, datatype
+        }
     }
 }
 
