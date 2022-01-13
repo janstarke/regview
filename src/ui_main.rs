@@ -3,7 +3,7 @@ use cursive::view::{Nameable, Resizable, SizeConstraint};
 use cursive::views::{DebugView, DummyView};
 use cursive::Cursive;
 use cursive::{
-    views::{LinearLayout, Panel, ResizedView, TextView, ViewRef, Dialog, EditView},
+    views::{LinearLayout, Panel, ResizedView, TextView, ViewRef, Dialog, EditView, OnEventView},
     CursiveRunnable,
 };
 use cursive::event;
@@ -30,6 +30,7 @@ struct RegviewUserdata {
     hive: Rc<RefCell<RegistryHive>>,
     search_regex: Option<String>
 }
+
 
 impl UIMain {
     pub fn new(hive: Rc<RefCell<RegistryHive>>) -> Self {
@@ -109,21 +110,51 @@ impl UIMain {
         self.siv.set_autohide_menu(false);
         self.siv.add_global_callback(event::Key::Esc, |s| s.select_menubar());
         self.siv.add_global_callback('f', |s| s.select_menubar());
+
+        self.siv.add_global_callback(event::Key::F3, UIMain::on_find);
     }
 
     fn on_find(siv: &mut Cursive) {
+        let user_data: &mut RegviewUserdata = siv.user_data().unwrap();
+        let edit_view = 
+            EditView::new()
+                .content(user_data.search_regex.as_ref().or(Some(&"".to_owned())).unwrap())
+                .with_name(NAME_SEARCH_REGEX)
+                .min_width(32);
+
+        let okay_handler = |s: &mut Cursive|{
+            Self::store_search_regex(s);
+            s.pop_layer();
+            Self::on_find_next(s);
+        };
         let mut find_dialog = Dialog::around(LinearLayout::vertical()
             .child(LinearLayout::horizontal()
                 .child(TextView::new("Search regex:"))
-                .child(EditView::new().min_width(32).with_name(NAME_SEARCH_REGEX))
+                .child(OnEventView::new(edit_view).on_event(event::Key::Enter, okay_handler))
             )
         );
-        find_dialog.add_button("Find", |s| {s.pop_layer();});
+        find_dialog.add_button("Find", okay_handler);
         find_dialog.add_button("Cancel", |s| {
             s.pop_layer();
 
         });
         siv.add_layer(find_dialog);
+    }
+
+    fn store_search_regex(siv: &mut Cursive) {
+        let edit_view: ViewRef<EditView> = siv.find_name(NAME_SEARCH_REGEX).unwrap();
+        let user_data: &mut RegviewUserdata = siv.user_data().unwrap();
+        user_data.search_regex = Some(edit_view.get_content().to_string());
+    }
+
+    fn on_find_next(siv: &mut Cursive) {
+        let user_data: &mut RegviewUserdata = siv.user_data().unwrap();
+        
+        if let Some(search_regex) = user_data.search_regex.as_ref() {
+            if ! search_regex.is_empty() {
+
+            }
+        }
     }
 
     fn on_submit(siv: &mut Cursive, _: usize, index: usize) {
