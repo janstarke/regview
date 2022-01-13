@@ -1,12 +1,14 @@
 use anyhow::Result;
 use cursive::view::{Nameable, Resizable, SizeConstraint};
-use cursive::views::{BoxedView, DebugView, DummyView};
+use cursive::views::{DebugView, DummyView};
 use cursive::Cursive;
 use cursive::{
     views::{LinearLayout, Panel, ResizedView, TextView, ViewRef},
     CursiveRunnable,
 };
+use cursive::event;
 use cursive_table_view::TableView;
+use cursive::menu::MenuTree;
 use std::cell::RefCell;
 use std::rc::Rc;
 
@@ -87,6 +89,21 @@ impl UIMain {
                 env!("CARGO_PKG_VERSION")
             )),
         );
+
+        self.siv.menubar()
+            .add_subtree("File",
+                MenuTree::new()
+                    .leaf("Find", UIMain::on_find)
+                    .delimiter()
+                    .leaf("Quit", |s| s.quit())
+        );
+        self.siv.set_autohide_menu(false);
+        self.siv.add_global_callback(event::Key::Esc, |s| s.select_menubar());
+        self.siv.add_global_callback('f', |s| s.select_menubar());
+    }
+
+    fn on_find(siv: &mut Cursive) {
+
     }
 
     fn on_submit(siv: &mut Cursive, _: usize, index: usize) {
