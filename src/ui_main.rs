@@ -1,20 +1,20 @@
 use anyhow::Result;
+use cursive::event;
+use cursive::menu::MenuTree;
 use cursive::view::{Nameable, Resizable, SizeConstraint};
 use cursive::views::{DebugView, DummyView};
 use cursive::Cursive;
 use cursive::{
-    views::{LinearLayout, Panel, ResizedView, TextView, ViewRef, Dialog, EditView, OnEventView},
+    views::{Dialog, EditView, LinearLayout, OnEventView, Panel, ResizedView, TextView, ViewRef},
     CursiveRunnable,
 };
-use cursive::event;
 use cursive_table_view::TableView;
-use cursive::menu::MenuTree;
 use std::cell::RefCell;
 use std::rc::Rc;
 
-use crate::keys_line::*;
-use crate::registry_hive::RegistryHive;
+use crate::registry_hive::{RegistryHive, SearchResult};
 use crate::values_line::*;
+use crate::{keys_line::*, registry_hive};
 
 static NAME_KEYS_TABLE: &str = "keys_table";
 static NAME_VALUES_TABLE: &str = "values_table";
@@ -28,9 +28,8 @@ pub struct UIMain {
 
 struct RegviewUserdata {
     hive: Rc<RefCell<RegistryHive>>,
-    search_regex: Option<String>
+    search_regex: Option<String>,
 }
-
 
 impl UIMain {
     pub fn new(hive: Rc<RefCell<RegistryHive>>) -> Self {
@@ -38,7 +37,7 @@ impl UIMain {
 
         let user_data = RegviewUserdata {
             hive,
-            search_regex: None
+            search_regex: None,
         };
         siv.set_user_data(user_data);
         let mut me = Self { siv: siv };
@@ -65,27 +64,34 @@ impl UIMain {
         //details_table.set_enabled(false);
 
         let reg_view = LinearLayout::horizontal()
-            .child(Panel::new(
-                keys_table
-                    .with_name(NAME_KEYS_TABLE)
-                    .full_height()
-                    .min_width(48)
-                    .max_width(64),
-            ).title("Keys"))
+            .child(
+                Panel::new(
+                    keys_table
+                        .with_name(NAME_KEYS_TABLE)
+                        .full_height()
+                        .min_width(48)
+                        .max_width(64),
+                )
+                .title("Keys"),
+            )
             .child(DummyView)
-            .child(Panel::new(
-                details_table.with_name(NAME_VALUES_TABLE).full_screen(),
-            ).title("Values"));
+            .child(
+                Panel::new(details_table.with_name(NAME_VALUES_TABLE).full_screen())
+                    .title("Values"),
+            );
 
         let root_view = LinearLayout::vertical()
             .child(TextView::new("").with_name(NAME_PATH_LINE))
             .child(reg_view)
-            .child(Panel::new(
-                DebugView::new()
-                    .with_name(NAME_DEBUG_VIEW)
-                    .min_height(3)
-                    .max_height(10),
-            ).title("Logging"));
+            .child(
+                Panel::new(
+                    DebugView::new()
+                        .with_name(NAME_DEBUG_VIEW)
+                        .min_height(3)
+                        .max_height(10),
+                )
+                .title("Logging"),
+            );
 
         self.siv.add_layer(
             Panel::new(ResizedView::new(
@@ -100,43 +106,50 @@ impl UIMain {
             )),
         );
 
-        self.siv.menubar()
-            .add_subtree("File",
-                MenuTree::new()
-                    .leaf("Find", UIMain::on_find)
-                    .delimiter()
-                    .leaf("Quit", |s| s.quit())
+        self.siv.menubar().add_subtree(
+            "File",
+            MenuTree::new()
+                .leaf("Find", UIMain::on_find)
+                .delimiter()
+                .leaf("Quit", |s| s.quit()),
         );
         self.siv.set_autohide_menu(false);
-        self.siv.add_global_callback(event::Key::Esc, |s| s.select_menubar());
+        self.siv
+            .add_global_callback(event::Key::Esc, |s| s.select_menubar());
         self.siv.add_global_callback('f', |s| s.select_menubar());
 
-        self.siv.add_global_callback(event::Key::F3, UIMain::on_find);
+        self.siv
+            .add_global_callback(event::Key::F3, UIMain::on_find);
     }
 
     fn on_find(siv: &mut Cursive) {
         let user_data: &mut RegviewUserdata = siv.user_data().unwrap();
-        let edit_view = 
-            EditView::new()
-                .content(user_data.search_regex.as_ref().or(Some(&"".to_owned())).unwrap())
-                .with_name(NAME_SEARCH_REGEX)
-                .min_width(32);
+        let edit_view = EditView::new()
+            .content(
+                user_data
+                    .search_regex
+                    .as_ref()
+                    .or(Some(&"".to_owned()))
+                    .unwrap(),
+            )
+            .with_name(NAME_SEARCH_REGEX)
+            .min_width(32);
 
-        let okay_handler = |s: &mut Cursive|{
+        let okay_handler = |s: &mut Cursive| {
             Self::store_search_regex(s);
             s.pop_layer();
             Self::on_find_next(s);
         };
-        let mut find_dialog = Dialog::around(LinearLayout::vertical()
-            .child(LinearLayout::horizontal()
-                .child(TextView::new("Search regex:"))
-                .child(OnEventView::new(edit_view).on_event(event::Key::Enter, okay_handler))
-            )
+        let mut find_dialog = Dialog::around(
+            LinearLayout::vertical().child(
+                LinearLayout::horizontal()
+                    .child(TextView::new("Search regex:"))
+                    .child(OnEventView::new(edit_view).on_event(event::Key::Enter, okay_handler)),
+            ),
         );
         find_dialog.add_button("Find", okay_handler);
         find_dialog.add_button("Cancel", |s| {
             s.pop_layer();
-
         });
         siv.add_layer(find_dialog);
     }
@@ -148,11 +161,59 @@ impl UIMain {
     }
 
     fn on_find_next(siv: &mut Cursive) {
-        let user_data: &mut RegviewUserdata = siv.user_data().unwrap();
-        
-        if let Some(search_regex) = user_data.search_regex.as_ref() {
-            if ! search_regex.is_empty() {
+        let search_regex = {
+            let user_data: &mut RegviewUserdata = siv.user_data().unwrap();
+            user_data.search_regex.clone()
+        };
 
+        if let Some(search_regex) = search_regex {
+            if !search_regex.is_empty() {
+                let search_result = {
+                    let user_data: &mut RegviewUserdata = siv.user_data().unwrap();
+                    let hive = &user_data.hive;
+                    hive.borrow_mut().find_regex(&search_regex).unwrap()
+                };
+
+                if matches!(search_result, SearchResult::None) {
+                    siv.add_layer(Dialog::info("nothing found"));
+                    return;
+                }
+
+                let user_data: &mut RegviewUserdata = siv.user_data().unwrap();
+                let hive = &user_data.hive;
+                let (new_items, key_name) = match search_result {
+                    SearchResult::KeyName(path) => (
+                        hive.borrow_mut().select_path(&path).unwrap(),
+                        path.last().and_then(|s| Some(s.to_owned())),
+                    ),
+                    SearchResult::ValueName(path, _) => (
+                        hive.borrow_mut().select_path(&path).unwrap(),
+                        path.last().and_then(|s| Some(s.to_owned())),
+                    ),
+                    SearchResult::ValueData(path, _) => (
+                        hive.borrow_mut().select_path(&path).unwrap(),
+                        path.last().and_then(|s| Some(s.to_owned())),
+                    ),
+                    _ => {
+                        panic!("this should have been handled some lines above");
+                    }
+                };
+
+                let mut keys_table: ViewRef<TableView<KeysLine, KeysColumn>> =
+                    siv.find_name(NAME_KEYS_TABLE).unwrap();
+                keys_table.clear();
+
+                let selection_index = if let Some(kn) = key_name {
+                    new_items.iter().position(|i| i.name() == kn)
+                } else {
+                    None
+                };
+
+                keys_table.set_items(new_items);
+                if let Some(index) = selection_index {
+                    keys_table.set_selected_item(index);
+                }
+                keys_table.sort();
             }
         }
     }
@@ -200,12 +261,14 @@ impl UIMain {
             siv.find_name(NAME_KEYS_TABLE).unwrap();
 
         let new_items = match keys_table.borrow_item(index) {
-            None => {
-                Vec::new()
-            }
+            None => Vec::new(),
             Some(item) => {
                 if item.is_parent() {
-                    vec![ValuesLine::new("parent key".to_owned(), "".to_owned(), "".to_owned())]
+                    vec![ValuesLine::new(
+                        "parent key".to_owned(),
+                        "".to_owned(),
+                        "".to_owned(),
+                    )]
                 } else {
                     let user_data: &RegviewUserdata = siv.user_data().unwrap();
                     let hive = &user_data.hive;
