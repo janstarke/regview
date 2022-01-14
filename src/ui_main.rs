@@ -182,29 +182,30 @@ impl UIMain {
 
                 let user_data: &mut RegviewUserdata = siv.user_data().unwrap();
                 let hive = &user_data.hive;
-                let (new_items, key_name) = match search_result {
+                let (new_items, path) = match search_result {
                     SearchResult::KeyName(path) => (
                         hive.borrow_mut().select_path(&path).unwrap(),
-                        path.last().and_then(|s| Some(s.to_owned())),
+                        path,
                     ),
                     SearchResult::ValueName(path, _) => (
                         hive.borrow_mut().select_path(&path).unwrap(),
-                        path.last().and_then(|s| Some(s.to_owned())),
+                        path,
                     ),
                     SearchResult::ValueData(path, _) => (
                         hive.borrow_mut().select_path(&path).unwrap(),
-                        path.last().and_then(|s| Some(s.to_owned())),
+                        path,
                     ),
                     _ => {
                         panic!("this should have been handled some lines above");
                     }
                 };
+                let key_name = path.last().and_then(|s| Some(s.to_owned()));
 
                 let mut keys_table: ViewRef<TableView<KeysLine, KeysColumn>> =
                     siv.find_name(NAME_KEYS_TABLE).unwrap();
                 keys_table.clear();
 
-                let selection_index = if let Some(kn) = key_name {
+                let selection_index = if let Some(kn) = key_name.as_ref() {
                     new_items.iter().position(|i| i.name() == kn)
                 } else {
                     None
@@ -215,6 +216,8 @@ impl UIMain {
                     keys_table.set_selected_item(index);
                 }
                 keys_table.sort();
+
+                siv.call_on_name(NAME_PATH_LINE, |l: &mut TextView| l.set_content(path.join("\\")));
             }
         }
     }
