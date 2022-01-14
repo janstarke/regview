@@ -3,7 +3,7 @@ use anyhow::{anyhow, Result};
 use regex::Regex;
 
 use memmap::MmapOptions;
-use nt_hive::{Hive, KeyNode};
+use nt_hive::{Hive, KeyNode, KeyValueData};
 
 use crate::keys_line::KeysLine;
 use crate::values_line::ValuesLine;
@@ -259,7 +259,6 @@ impl RegistryHive {
                                     }
                                 }
 
-
                                 /*
                                  * value data matches (REG_MULTI_SZ)
                                  */
@@ -268,6 +267,32 @@ impl RegistryHive {
                                         if search_regex.is_match(&value) {
                                             let current_path = current_path.clone();
                                             return Ok(SearchResult::ValueData(current_path, value_name));
+                                        }
+                                    }
+                                }
+
+                                /*
+                                 * search in binary data
+                                 */
+                                if let Ok(value) = value.data() {
+                                    match value {
+                                        KeyValueData::Small(bytes) => {
+                                            if search_regex.is_match(&String::from_utf8_lossy(bytes)) {
+                                                return Ok(SearchResult::ValueData(current_path.clone(), value_name));
+                                            }
+                                        }
+
+                                        KeyValueData::Big(slice) => {
+                                            for bytes_result in slice {
+                                                match bytes_result {
+                                                    Err(why) => return Err(anyhow!(why)),
+                                                    Ok(bytes) => {
+                                                        if search_regex.is_match(&String::from_utf8_lossy(bytes)) {
+                                                            return Ok(SearchResult::ValueData(current_path.clone(), value_name));
+                                                        }
+                                                    }
+                                                }
+                                            }
                                         }
                                     }
                                 }
