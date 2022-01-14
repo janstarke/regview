@@ -197,21 +197,31 @@ impl UIMain {
                 let hive = &user_data.hive;
                 let (new_items, path) = match search_result {
                     SearchResult::KeyName(path) => (
-                        hive.borrow_mut().select_path(&path).unwrap(),
+                        hive.borrow_mut().select_path(&path),
                         path,
                     ),
                     SearchResult::ValueName(path, _) => (
-                        hive.borrow_mut().select_path(&path).unwrap(),
+                        hive.borrow_mut().select_path(&path),
                         path,
                     ),
                     SearchResult::ValueData(path, _) => (
-                        hive.borrow_mut().select_path(&path).unwrap(),
+                        hive.borrow_mut().select_path(&path),
                         path,
                     ),
                     _ => {
                         panic!("this should have been handled some lines above");
                     }
                 };
+                let new_items = match new_items {
+                    Ok(items) => items,
+                    Err(why) => {
+                        UIMain::display_error(siv, why);
+                        return;
+                    }
+                };
+
+                siv.add_layer(Dialog::info(format!("info: {:?}", new_items.len())));
+
                 let key_name = path.last().and_then(|s| Some(s.to_owned()));
 
                 let mut keys_table: ViewRef<TableView<KeysLine, KeysColumn>> =

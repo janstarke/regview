@@ -1,0 +1,17 @@
+{
+    "version": "0.2.0",
+    "configurations": [
+        {
+            "name": "(OSX) Launch",
+            "type": "lldb",
+            "request": "launch",
+            "program": "${workspaceRoot}/target/debug/regview",
+            "args": ["${workspaceRoot}/samples/SOFTWARE"],
+            "cwd": "${workspaceRoot}",
+            "env": {
+                "TERM": "xterm-256color"
+            },
+            "console": "externalTerminal"
+        }
+    ]
+}

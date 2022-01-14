@@ -9,7 +9,7 @@ use crate::keys_line::KeysLine;
 use crate::values_line::ValuesLine;
 use crate::mmap_byteslice::MmapByteSlice;
 
-
+#[derive(Debug)]
 pub enum SearchResult {
     None,
     KeyName(Vec<String>),
@@ -48,7 +48,14 @@ impl RegistryHive {
     pub fn current_keys(&self) -> Result<Vec<KeysLine>> {
         let mut keys = vec![KeysLine::parent()];
         let root = self.hive.root_key_node()?;
-        let current_node = root.subpath(&self.path()).unwrap()?;
+        let current_node = 
+        match root.subpath(&self.path()) {
+            None => {return Err(anyhow!("current path is invalid: '{}'", self.path()));}
+            Some(node_result) => {match node_result {
+                Err(why) => { return Err(anyhow!(why)); }
+                Ok(node) => node
+            }}
+        };
 
         if let Some(subkeys_result) = current_node.subkeys() {
             match subkeys_result {
@@ -178,7 +185,6 @@ impl RegistryHive {
          */
         if search_regex.is_match(&subkey_name) {
             let mut current_path = current_path.clone();
-            current_path.push(subkey_name);
             return Ok(SearchResult::KeyName(current_path));
         }
 
@@ -186,12 +192,10 @@ impl RegistryHive {
         /*
          * check attributes
          */
-        current_path.push(subkey_name);
         let result = self.find_in_attributes(current_path, &current_node, search_regex)?;
         if result.is_some() {
             return Ok(result);
         }
-        current_path.pop();
         Ok(SearchResult::None)
     }
 
@@ -204,10 +208,19 @@ impl RegistryHive {
                         match subkey_result {
                             Err(why) => {return Err(anyhow!(why));}
                             Ok(subkey) => {
+                                let subkey_name = subkey.name()?.to_string_lossy();
+                                current_path.push(subkey_name);
+
                                 let result = self.find_in_this_node(current_path, &subkey, search_regex)?;
                                 if result.is_some() {
                                     return Ok(result);
                                 }
+
+                                let result = self.find_in_subkeys(current_path, &subkey, search_regex)?;
+                                if result.is_some() {
+                                    return Ok(result);
+                                }
+                                current_path.pop();
                             }
                         }
                     }
