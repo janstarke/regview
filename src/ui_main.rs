@@ -12,9 +12,9 @@ use cursive_table_view::TableView;
 use std::cell::RefCell;
 use std::rc::Rc;
 
+use crate::keys_line::*;
 use crate::registry_hive::{RegistryHive, SearchResult};
 use crate::values_line::*;
-use crate::keys_line::*;
 
 static NAME_KEYS_TABLE: &str = "keys_table";
 static NAME_VALUES_TABLE: &str = "values_table";
@@ -199,26 +199,17 @@ impl UIMain {
                     SearchResult::KeyName(path) => {
                         let mut parent_path = path.clone();
                         parent_path.pop();
-                        (
-                            hive.borrow_mut().select_path(&parent_path),
-                            path,
-                        )
+                        (hive.borrow_mut().select_path(&parent_path), path)
                     }
                     SearchResult::ValueName(path, _) => {
                         let mut parent_path = path.clone();
                         parent_path.pop();
-                        (
-                            hive.borrow_mut().select_path(&parent_path),
-                            path,
-                        )
+                        (hive.borrow_mut().select_path(&parent_path), path)
                     }
                     SearchResult::ValueData(path, _) => {
                         let mut parent_path = path.clone();
                         parent_path.pop();
-                        (
-                            hive.borrow_mut().select_path(&parent_path),
-                            path,
-                        )
+                        (hive.borrow_mut().select_path(&parent_path), path)
                     }
                     _ => {
                         panic!("this should have been handled some lines above");
@@ -251,7 +242,9 @@ impl UIMain {
                 }
                 keys_table.sort();
 
-                siv.call_on_name(NAME_PATH_LINE, |l: &mut TextView| l.set_content(path.join("\\")));
+                siv.call_on_name(NAME_PATH_LINE, |l: &mut TextView| {
+                    l.set_content(path.join("\\"))
+                });
             }
         }
     }
@@ -261,29 +254,38 @@ impl UIMain {
             siv.find_name(NAME_KEYS_TABLE).unwrap();
         let user_data: &RegviewUserdata = siv.user_data().unwrap();
         let hive = &user_data.hive;
-        let selected_node = hive.borrow().selected_node();
-        let mut select_node = selected_node.is_some();
-        let new_items = match keys_table.borrow_item(index) {
+        let selected_node_name = hive.borrow().selected_node();
+        let mut select_node = selected_node_name.is_some();
+        let selected_node = match keys_table.borrow_item(index) {
             None => return,
-            Some(item) => {
-                if item.is_parent() {
-                    select_node = select_node & true;
-                    hive.borrow_mut().leave().unwrap()
-                } else {
-                    if item.is_leaf_node() {
-                        return;
-                    } else {
-                        hive.borrow_mut().enter(item.name()).unwrap()
-                    }
-                }
-            }
+            Some(item) => item,
         };
 
+        let new_items = if selected_node.is_parent() {
+            select_node = select_node & true;
+            hive.borrow_mut().leave().unwrap()
+        } else {
+            if selected_node.is_leaf_node() {
+                return;
+            } else {
+                hive.borrow_mut().enter(selected_node.name()).unwrap()
+            }
+        };
+/*
+        if selected_node.is_parent() {
+
+        } else {
+            siv.call_on_name(
+                NAME_VALUES_TABLE,
+                |values_table: &mut TableView<ValuesLine, ValuesColumn>| values_table.clear(),
+            );
+        }
+*/
         keys_table.clear();
         let selection_index = if select_node {
             new_items
                 .iter()
-                .position(|i| i.name() == selected_node.as_ref().unwrap())
+                .position(|i| i.name() == selected_node_name.as_ref().unwrap())
         } else {
             None
         };
@@ -296,6 +298,7 @@ impl UIMain {
 
         let path = hive.borrow().path();
         siv.call_on_name(NAME_PATH_LINE, |l: &mut TextView| l.set_content(path));
+
     }
 
     fn on_select(siv: &mut Cursive, _: usize, index: usize) {
@@ -306,11 +309,7 @@ impl UIMain {
             None => Vec::new(),
             Some(item) => {
                 if item.is_parent() {
-                    vec![ValuesLine::new(
-                        "parent key".to_owned(),
-                        "".to_owned(),
-                        "".to_owned(),
-                    )]
+                    vec![]
                 } else {
                     let user_data: &RegviewUserdata = siv.user_data().unwrap();
                     let hive = &user_data.hive;

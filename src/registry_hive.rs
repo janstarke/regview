@@ -184,7 +184,7 @@ impl RegistryHive {
          * key name matches
          */
         if search_regex.is_match(&subkey_name) {
-            let mut current_path = current_path.clone();
+            let current_path = current_path.clone();
             return Ok(SearchResult::KeyName(current_path));
         }
 

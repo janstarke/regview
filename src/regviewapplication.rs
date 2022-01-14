@@ -28,11 +28,10 @@ impl RegViewApplication {
             .author(env!("CARGO_PKG_AUTHORS"))
             .about(env!("CARGO_PKG_DESCRIPTION"))
             .arg(
-                Arg::new("REG_FILE")
+                Arg::with_name("REG_FILE")
                     .help("path to registry hive file")
                     .required(true)
-                    .multiple_occurrences(false)
-                    .multiple_values(false)
+                    .multiple(false)
                     .takes_value(true),
             );
         
