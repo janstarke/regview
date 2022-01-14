@@ -113,8 +113,8 @@ impl RegistryHive {
 
     pub fn find_regex(&mut self, search_regex: &str) -> Result<SearchResult> {
         let regex = Regex::new(search_regex)?;
-        let root = self.hive.root_key_node()?;
-        let current_node = root.subpath(&(self.path())).unwrap()?;
+        let root = self.hive.root_key_node().expect("missing root node");
+        let current_node = root.subpath(&(self.path())).unwrap().expect("invalid node path");
         
         let mut search_path = self.path.clone();
         let result = self.find_in_subkeys(&mut search_path, &current_node, &regex)?;

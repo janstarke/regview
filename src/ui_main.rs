@@ -161,6 +161,10 @@ impl UIMain {
         user_data.search_regex = Some(edit_view.get_content().to_string());
     }
 
+    fn display_error(siv: &mut Cursive, error: anyhow::Error) {
+        siv.add_layer(Dialog::info(format!("ERROR: {}", error)));
+    }
+
     fn on_find_next(siv: &mut Cursive) {
         let search_regex = {
             let user_data: &mut RegviewUserdata = siv.user_data().unwrap();
@@ -170,9 +174,18 @@ impl UIMain {
         if let Some(search_regex) = search_regex {
             if !search_regex.is_empty() {
                 let search_result = {
-                    let user_data: &mut RegviewUserdata = siv.user_data().unwrap();
-                    let hive = &user_data.hive;
-                    hive.borrow_mut().find_regex(&search_regex).unwrap()
+                    let search_result = {
+                        let user_data: &mut RegviewUserdata = siv.user_data().unwrap();
+                        let hive = &user_data.hive;
+                        hive.borrow_mut().find_regex(&search_regex)
+                    };
+                    match search_result {
+                        Ok(result) => result,
+                        Err(why) => {
+                            UIMain::display_error(siv, why);
+                            return;
+                        }
+                    }
                 };
 
                 if matches!(search_result, SearchResult::None) {
