@@ -73,9 +73,9 @@ impl TableViewItem<KeysColumn> for KeysLine {
                 if self.is_leaf_node {"".to_owned()}
                 else {
                     if self.is_parent {
-                        "\u{2303}".to_owned()
+                        "^".to_owned()
                     } else {
-                        "\u{2304}".to_owned()
+                        "v".to_owned()
                     }
                 }
             }
