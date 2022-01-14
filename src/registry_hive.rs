@@ -250,12 +250,25 @@ impl RegistryHive {
                                 }
 
                                 /*
-                                 * value data matches
+                                 * value data matches (REG_SZ, REG_EXPAND_SZ)
                                  */
                                 if let Ok(data) = value.string_data() {
                                     if search_regex.is_match(&data) {
                                         let current_path = current_path.clone();
                                         return Ok(SearchResult::ValueData(current_path, value_name));
+                                    }
+                                }
+
+
+                                /*
+                                 * value data matches (REG_MULTI_SZ)
+                                 */
+                                if let Ok(values) = value.multi_string_data() {
+                                    for value in values {
+                                        if search_regex.is_match(&value) {
+                                            let current_path = current_path.clone();
+                                            return Ok(SearchResult::ValueData(current_path, value_name));
+                                        }
                                     }
                                 }
                             }
