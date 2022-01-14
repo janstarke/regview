@@ -49,7 +49,7 @@ impl UIMain {
         self.siv.add_global_callback('q', |s| s.quit());
 
         let mut keys_table = TableView::<KeysLine, KeysColumn>::new()
-            .column(KeysColumn::NodeType, "", |c|{c.width(2)})
+            .column(KeysColumn::NodeType, "", |c|{c.width(1)})
             .column(KeysColumn::Name, "Name", |c| {c})
             //.column(KeysColumn::LastWritten, "Last written", |c| c.width(20))
         ;

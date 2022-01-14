@@ -71,7 +71,13 @@ impl TableViewItem<KeysColumn> for KeysLine {
         match column {
             KeysColumn::NodeType => {
                 if self.is_leaf_node {"".to_owned()}
-                else {"->".to_owned()}
+                else {
+                    if self.is_parent {
+                        "\u{2303}".to_owned()
+                    } else {
+                        "\u{2304}".to_owned()
+                    }
+                }
             }
             KeysColumn::Name => self.name.to_owned(),
             //KeysColumn::LastWritten => { panic!("not supported"); }
