@@ -49,6 +49,7 @@ impl UIMain {
         self.siv.add_global_callback('q', |s| s.quit());
 
         let mut keys_table = TableView::<KeysLine, KeysColumn>::new()
+            .column(KeysColumn::NodeType, "", |c|{c.width(2)})
             .column(KeysColumn::Name, "Name", |c| {c})
             //.column(KeysColumn::LastWritten, "Last written", |c| c.width(20))
         ;
@@ -232,7 +233,11 @@ impl UIMain {
                     select_node = select_node & true;
                     hive.borrow_mut().leave().unwrap()
                 } else {
-                    hive.borrow_mut().enter(item.name()).unwrap()
+                    if item.is_leaf_node() {
+                        return;
+                    } else {
+                        hive.borrow_mut().enter(item.name()).unwrap()
+                    }
                 }
             }
         };
