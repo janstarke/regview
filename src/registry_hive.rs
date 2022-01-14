@@ -31,10 +31,14 @@ pub struct RegistryHive {
 }
 
 impl RegistryHive {
-    pub fn new(hive_file: File) -> Result<Self> {
+    pub fn new(hive_file: File, omit_validation: bool) -> Result<Self> {
         let mmap = unsafe { MmapOptions::new().map(&hive_file)? };
         let slice = MmapByteSlice::new(mmap);
-        let hive = Hive::without_validation(slice)?;
+        let hive = if omit_validation{
+            Hive::without_validation(slice)?
+        } else {
+            Hive::new(slice)?
+        };
         Ok(Self {
             hive,
             path: vec![],
