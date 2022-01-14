@@ -212,6 +212,7 @@ impl UIMain {
                         panic!("this should have been handled some lines above");
                     }
                 };
+
                 let new_items = match new_items {
                     Ok(items) => items,
                     Err(why) => {
@@ -219,8 +220,6 @@ impl UIMain {
                         return;
                     }
                 };
-
-                siv.add_layer(Dialog::info(format!("info: {:?}", new_items.len())));
 
                 let key_name = path.last().and_then(|s| Some(s.to_owned()));
 
