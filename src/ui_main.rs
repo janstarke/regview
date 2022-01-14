@@ -196,18 +196,30 @@ impl UIMain {
                 let user_data: &mut RegviewUserdata = siv.user_data().unwrap();
                 let hive = &user_data.hive;
                 let (new_items, path) = match search_result {
-                    SearchResult::KeyName(path) => (
-                        hive.borrow_mut().select_path(&path),
-                        path,
-                    ),
-                    SearchResult::ValueName(path, _) => (
-                        hive.borrow_mut().select_path(&path),
-                        path,
-                    ),
-                    SearchResult::ValueData(path, _) => (
-                        hive.borrow_mut().select_path(&path),
-                        path,
-                    ),
+                    SearchResult::KeyName(path) => {
+                        let mut parent_path = path.clone();
+                        parent_path.pop();
+                        (
+                            hive.borrow_mut().select_path(&parent_path),
+                            path,
+                        )
+                    }
+                    SearchResult::ValueName(path, _) => {
+                        let mut parent_path = path.clone();
+                        parent_path.pop();
+                        (
+                            hive.borrow_mut().select_path(&parent_path),
+                            path,
+                        )
+                    }
+                    SearchResult::ValueData(path, _) => {
+                        let mut parent_path = path.clone();
+                        parent_path.pop();
+                        (
+                            hive.borrow_mut().select_path(&parent_path),
+                            path,
+                        )
+                    }
                     _ => {
                         panic!("this should have been handled some lines above");
                     }
