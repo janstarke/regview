@@ -1,13 +1,8 @@
 use std::fs::File;
-use std::cell::{RefCell, Ref};
-use std::rc::Rc;
 use anyhow::{anyhow, Result};
-use std::hash::{Hash, Hasher};
-use std::collections::HashMap;
-use std::collections::hash_map::DefaultHasher;
 use regex::Regex;
 
-use memmap::{Mmap, MmapOptions};
+use memmap::MmapOptions;
 use nt_hive::{Hive, KeyNode};
 
 use crate::keys_line::KeysLine;
@@ -31,26 +26,18 @@ impl SearchResult {
     }
 }
 pub struct RegistryHive {
-    hive_file: File,
-    //mmap: Mmap,
     hive: Hive<MmapByteSlice>,
     path: Vec<String>,
-
-    values_cache: HashMap<u64, Rc<Vec<ValuesLine>>>,
 }
 
 impl RegistryHive {
     pub fn new(hive_file: File) -> Result<Self> {
         let mmap = unsafe { MmapOptions::new().map(&hive_file)? };
         let slice = MmapByteSlice::new(mmap);
-        let mut hive = Hive::without_validation(slice)?;
-        let mut root_node = hive.root_key_node()?;
+        let hive = Hive::without_validation(slice)?;
         Ok(Self {
-            hive_file,
-            //mmap,
             hive,
             path: vec![],
-            values_cache: HashMap::new(),
         })
     }
 
@@ -124,12 +111,6 @@ impl RegistryHive {
         Ok(value_list)
     }
 
-    fn hash_of<T>(v: Ref<T>) -> u64 where T: Hash{
-        let mut hasher = DefaultHasher::new();
-        v.hash(&mut hasher);
-        hasher.finish()
-    }
-
     pub fn find_regex(&mut self, search_regex: &str) -> Result<SearchResult> {
         let regex = Regex::new(search_regex)?;
         let root = self.hive.root_key_node()?;
@@ -184,11 +165,9 @@ impl RegistryHive {
                         }
                     }
                 }
-
                 return self.find_in_siblings(current_path, &parent_node, search_regex);
             }
         }
-        Ok(SearchResult::None)
     }
 
     fn find_in_this_node(&self, current_path: &mut Vec<String>, current_node: &KeyNode<&Hive<MmapByteSlice>, MmapByteSlice>, search_regex: &Regex) -> Result<SearchResult> {

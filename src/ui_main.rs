@@ -14,7 +14,7 @@ use std::rc::Rc;
 
 use crate::registry_hive::{RegistryHive, SearchResult};
 use crate::values_line::*;
-use crate::{keys_line::*, registry_hive};
+use crate::keys_line::*;
 
 static NAME_KEYS_TABLE: &str = "keys_table";
 static NAME_VALUES_TABLE: &str = "values_table";
