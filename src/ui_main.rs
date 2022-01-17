@@ -1,8 +1,9 @@
 use anyhow::Result;
-use cursive::event;
+use cursive::backend::Backend;
+use cursive::{event, View};
 use cursive::menu::MenuTree;
-use cursive::view::{Nameable, Resizable, SizeConstraint};
-use cursive::views::{DebugView, DummyView};
+use cursive::view::{Nameable, Resizable, SizeConstraint, Selector};
+use cursive::views::{DummyView, ProgressBar};
 use cursive::Cursive;
 use cursive::{
     views::{Dialog, EditView, LinearLayout, OnEventView, Panel, ResizedView, TextView, ViewRef},
@@ -13,14 +14,17 @@ use std::cell::RefCell;
 use std::rc::Rc;
 
 use crate::keys_line::*;
-use crate::registry_hive::{RegistryHive, SearchResult};
+use crate::registry_hive::{RegistryHive};
 use crate::values_line::*;
+use crate::search_result::*;
 
 static NAME_KEYS_TABLE: &str = "keys_table";
 static NAME_VALUES_TABLE: &str = "values_table";
 static NAME_PATH_LINE: &str = "path_line";
 static NAME_DEBUG_VIEW: &str = "debug_view";
 static NAME_SEARCH_REGEX: &str = "search_regex";
+static NAME_SEARCH_RESULTS: &str = "search_results";
+static NAME_SEARCH_PANEL: &str = "search_panel";
 
 pub struct UIMain {
     siv: CursiveRunnable,
@@ -81,17 +85,20 @@ impl UIMain {
                     .title("Values"),
             );
 
+        let mut search_results = TableView::<SearchResultLine, SearchResultColumns>::new()
+            .column(SearchResultColumns::KeyName, "Key", |c| c.width(48))
+            .column(SearchResultColumns::ValueName, "Value", |c| c.width(16))
+            .column(SearchResultColumns::ValueData, "Value", |c| c);
+
+        search_results.set_on_submit(UIMain::on_select_search_result);
+
         let root_view = LinearLayout::vertical()
             .child(TextView::new("").with_name(NAME_PATH_LINE))
             .child(reg_view)
             .child(
-                Panel::new(
-                    DebugView::new()
-                        .with_name(NAME_DEBUG_VIEW)
-                        .min_height(3)
-                        .max_height(10),
-                )
-                .title("Logging"),
+                Panel::new(search_results.with_name(NAME_SEARCH_RESULTS).full_width().max_height(10).min_height(10))
+                .title("Search results")
+                .with_name(NAME_SEARCH_PANEL)
             );
 
         self.siv.add_layer(
@@ -188,34 +195,16 @@ impl UIMain {
                     }
                 };
 
-                if matches!(search_result, SearchResult::None) {
-                    siv.add_layer(Dialog::info("nothing found"));
-                    return;
-                }
-
                 let user_data: &mut RegviewUserdata = siv.user_data().unwrap();
                 let hive = &user_data.hive;
-                let (new_items, path) = match search_result {
-                    SearchResult::KeyName(path) => {
-                        let mut parent_path = path.clone();
-                        parent_path.pop();
-                        (hive.borrow_mut().select_path(&parent_path), path)
-                    }
-                    SearchResult::ValueName(path, _) => {
-                        let mut parent_path = path.clone();
-                        parent_path.pop();
-                        (hive.borrow_mut().select_path(&parent_path), path)
-                    }
-                    SearchResult::ValueData(path, _) => {
-                        let mut parent_path = path.clone();
-                        parent_path.pop();
-                        (hive.borrow_mut().select_path(&parent_path), path)
-                    }
-                    _ => {
-                        panic!("this should have been handled some lines above");
-                    }
-                };
+                siv.call_on_name(NAME_SEARCH_RESULTS, |sr_table: &mut TableView<SearchResultLine, SearchResultColumns>| {
+                    sr_table.clear();
+                    sr_table.set_items(search_result.into_iter().map(SearchResultLine::from).collect());
 
+                });
+                let _ = siv.focus(&Selector::Name(NAME_SEARCH_RESULTS));
+
+/*
                 let new_items = match new_items {
                     Ok(items) => items,
                     Err(why) => {
@@ -223,7 +212,6 @@ impl UIMain {
                         return;
                     }
                 };
-
                 let key_name = path.last().and_then(|s| Some(s.to_owned()));
 
                 let mut keys_table: ViewRef<TableView<KeysLine, KeysColumn>> =
@@ -245,8 +233,45 @@ impl UIMain {
                 siv.call_on_name(NAME_PATH_LINE, |l: &mut TextView| {
                     l.set_content(path.join("\\"))
                 });
+                */
             }
         }
+    }
+
+    fn on_select_search_result(siv: &mut Cursive, _: usize, index: usize) {
+        let search_results_table: ViewRef<TableView<SearchResultLine, SearchResultColumns>> =siv.find_name(NAME_SEARCH_RESULTS).unwrap();
+        let mut selected_line = match search_results_table.borrow_item(index) {
+            None => return,
+            Some(item) => item.clone()
+        };
+
+        let my_key = selected_line.path.pop();
+
+        let user_data: &mut RegviewUserdata = siv.user_data().unwrap();
+        let hive = &user_data.hive;
+
+        // FIXME: this unwrap may crash
+        let new_items = hive.borrow_mut().select_path(&selected_line.path).unwrap();
+
+        let mut keys_table: ViewRef<TableView<KeysLine, KeysColumn>> =
+        siv.find_name(NAME_KEYS_TABLE).unwrap();
+        keys_table.clear();
+
+        let selection_index = match my_key {
+            Some(kn) =>  new_items.iter().position(|i| i.name() == kn),
+            None => None
+        };
+
+        keys_table.set_items(new_items);
+        if let Some(index) = selection_index {
+            keys_table.set_selected_item(index);
+        }
+        keys_table.sort();
+
+        siv.call_on_name(NAME_PATH_LINE, |l: &mut TextView| {
+            l.set_content(selected_line.path.join("\\"))
+        });
+
     }
 
     fn on_submit(siv: &mut Cursive, _: usize, index: usize) {

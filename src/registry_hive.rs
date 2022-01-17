@@ -1,6 +1,7 @@
 use std::fs::File;
 use anyhow::{anyhow, Result};
 use regex::Regex;
+use thiserror::Error;
 
 use memmap::MmapOptions;
 use nt_hive::{Hive, KeyNode, KeyValueData, KeyValueDataType};
@@ -8,23 +9,17 @@ use nt_hive::{Hive, KeyNode, KeyValueData, KeyValueDataType};
 use crate::keys_line::KeysLine;
 use crate::values_line::ValuesLine;
 use crate::mmap_byteslice::MmapByteSlice;
+use crate::search_result::SearchResult;
 
-#[derive(Debug)]
-pub enum SearchResult {
-    None,
-    KeyName(Vec<String>),
-    ValueName(Vec<String>, String),
-    ValueData(Vec<String>, String)
+#[derive(Error, Debug)]
+pub enum SearchError {
+    #[error("No results found.")]
+    NoResult,
+
+    #[error("Too many results found.")]
+    TooManyResults
 }
 
-impl SearchResult {
-    pub fn is_none(&self) -> bool {
-        matches!(*self, SearchResult::None)
-    }
-    pub fn is_some(&self) -> bool {
-        ! self.is_none()
-    }
-}
 pub struct RegistryHive {
     hive: Hive<MmapByteSlice>,
     path: Vec<String>,
@@ -122,66 +117,37 @@ impl RegistryHive {
         Ok(value_list)
     }
 
-    pub fn find_regex(&mut self, search_regex: &str) -> Result<SearchResult> {
+    pub fn find_regex(&mut self, search_regex: &str) -> Result<Vec<SearchResult>> {
         let regex = Regex::new(search_regex)?;
         let root = self.hive.root_key_node()?;
         let current_node = root.subpath(&(self.path())).unwrap()?;
-        
-        let mut search_path = self.path.clone();
-        let result = self.find_in_subkeys(&mut search_path, &current_node, &regex)?;
-        if result.is_some() {
-            return Ok(result);
-        }
-        self.find_in_siblings(&mut search_path, &current_node, &regex)
-    }
-
-    fn find_in_siblings(&self, current_path: &mut Vec<String>, current_node: &KeyNode<&Hive<MmapByteSlice>, MmapByteSlice>, search_regex: &Regex) -> Result<SearchResult> {
+        let mut search_result = Vec::new();
         let root = self.hive.root_key_node()?;
-        match current_path.pop() {
-            None => {
-                // we already have the root node, which has no siblings
-                return Ok(SearchResult::None);
-            }
-
-            Some(_) => {
-                let parent_node = root.subpath(&current_path.join("\\")).unwrap()?;
-                let mut found_current_node = false;
-                
-                if let Some(subkeys_result) = parent_node.subkeys() {
-                    match subkeys_result {
-                        Err(why) => {return Err(anyhow!(why));}
-                        Ok(subkeys) => {
-                            for subkey_result in subkeys {
-                                match subkey_result {
-                                    Err(why) => {return Err(anyhow!(why));}
-                                    Ok(subkey) => {
-                                        if found_current_node {
-                                            let result = self.find_in_this_node(current_path, &subkey, search_regex)?;
-                                            if result.is_some() {
-                                                return Ok(result);
-                                            }
-
-                                            let result = self.find_in_subkeys(current_path, &subkey, search_regex)?;
-                                            if result.is_some() {
-                                                return Ok(result);
-                                            }
-                                        } else {
-                                            if subkey.name()? == current_node.name()? {
-                                                found_current_node = true;
-                                            }
-                                        }
-                                    }
-                                }
-                            }
-                        }
-                    }
-                }
-                return self.find_in_siblings(current_path, &parent_node, search_regex);
-            }
+        let mut current_path = Vec::new();
+        
+        self.find_here_and_below(&mut current_path, &current_node, &regex, &mut search_result)?;
+        if search_result.is_empty() {
+            return Err(anyhow!(SearchError::NoResult));
+        } else {
+            return Ok(search_result);
         }
     }
 
-    fn find_in_this_node(&self, current_path: &mut Vec<String>, current_node: &KeyNode<&Hive<MmapByteSlice>, MmapByteSlice>, search_regex: &Regex) -> Result<SearchResult> {
+    fn find_here_and_below(&self,
+                            current_path: &mut Vec<String>,
+                            current_node: &KeyNode<&Hive<MmapByteSlice>, MmapByteSlice>,
+                            search_regex: &Regex,
+                            search_result: &mut Vec<SearchResult>) -> Result<()> {
+        self.find_in_this_node(current_path, current_node, search_regex, search_result)?;
+        self.find_in_subkeys_of(current_path, &current_node, search_regex, search_result)?;
+        Ok(())
+    }
+
+    fn find_in_this_node(&self,
+                        current_path: &mut Vec<String>,
+                        current_node: &KeyNode<&Hive<MmapByteSlice>, MmapByteSlice>,
+                        search_regex: &Regex,
+                        search_result: &mut Vec<SearchResult>) -> Result<()> {
         let subkey_name = current_node.name()?.to_string_lossy();
         
         /*
@@ -189,21 +155,21 @@ impl RegistryHive {
          */
         if search_regex.is_match(&subkey_name) {
             let current_path = current_path.clone();
-            return Ok(SearchResult::KeyName(current_path));
+            search_result.push(SearchResult::KeyName(current_path));
         }
 
 
         /*
          * check attributes
          */
-        let result = self.find_in_attributes(current_path, &current_node, search_regex)?;
-        if result.is_some() {
-            return Ok(result);
-        }
-        Ok(SearchResult::None)
+        self.find_in_attributes(current_path, &current_node, search_regex, search_result)
     }
 
-    fn find_in_subkeys(&self, current_path: &mut Vec<String>, current_node: &KeyNode<&Hive<MmapByteSlice>, MmapByteSlice>, search_regex: &Regex) -> Result<SearchResult> {
+    fn find_in_subkeys_of(&self,
+                        current_path: &mut Vec<String>,
+                        current_node: &KeyNode<&Hive<MmapByteSlice>, MmapByteSlice>,
+                        search_regex: &Regex,
+                        search_result: &mut Vec<SearchResult>) -> Result<()> {
         if let Some(subkeys_result) = current_node.subkeys() {
             match subkeys_result {
                 Err(why) => {return Err(anyhow!(why));}
@@ -214,16 +180,7 @@ impl RegistryHive {
                             Ok(subkey) => {
                                 let subkey_name = subkey.name()?.to_string_lossy();
                                 current_path.push(subkey_name);
-
-                                let result = self.find_in_this_node(current_path, &subkey, search_regex)?;
-                                if result.is_some() {
-                                    return Ok(result);
-                                }
-
-                                let result = self.find_in_subkeys(current_path, &subkey, search_regex)?;
-                                if result.is_some() {
-                                    return Ok(result);
-                                }
+                                self.find_here_and_below(current_path, &subkey, search_regex, search_result)?;
                                 current_path.pop();
                             }
                         }
@@ -231,10 +188,14 @@ impl RegistryHive {
                 }
             }
         }
-        Ok(SearchResult::None)
+        Ok(())
     }
 
-    fn find_in_attributes(&self, current_path: &mut Vec<String>, current_node: &KeyNode<&Hive<MmapByteSlice>, MmapByteSlice>, search_regex: &Regex) -> Result<SearchResult> {
+    fn find_in_attributes(&self,
+                            current_path: &mut Vec<String>,
+                            current_node: &KeyNode<&Hive<MmapByteSlice>, MmapByteSlice>,
+                            search_regex: &Regex,
+                            search_result: &mut Vec<SearchResult>) -> Result<()> {
         if let Some(values_result) = current_node.values() {
             match values_result {
                 Err(why) => {return Err(anyhow!(why));}
@@ -244,27 +205,27 @@ impl RegistryHive {
                             Err(why) => {return Err(anyhow!(why));}
                             Ok(value) => {
                                 let value_name = value.name()?.to_string_lossy();
-
                                 /*
                                  * value name matches
                                  */
+                                let name_matches = 
                                 if search_regex.is_match(&value_name) {
-                                    let current_path = current_path.clone();
-                                    return Ok(SearchResult::ValueName(current_path, value_name));
-                                }
+                                    true
+                                } else {
+                                    false
+                                };
 
+                                let mut matching_value = None;
                                 match value.data_type()? {
 
                                     /*
                                      * value data matches (REG_SZ, REG_EXPAND_SZ)
                                      */
                                     KeyValueDataType::RegSZ | KeyValueDataType::RegExpandSZ => {
-                                        if let Ok(data) = value.string_data() {
-                                            if search_regex.is_match(&data) {
-                                                let current_path = current_path.clone();
-                                                return Ok(SearchResult::ValueData(current_path, value_name));
-                                            }
-                                        }
+                                        let value = value.string_data()?;
+                                            if search_regex.is_match(&value) {
+                                                matching_value = Some(value);
+                                            } 
                                     }
 
                                     /*
@@ -274,8 +235,7 @@ impl RegistryHive {
                                         if let Ok(values) = value.multi_string_data() {
                                             for value in values {
                                                 if search_regex.is_match(&value) {
-                                                    let current_path = current_path.clone();
-                                                    return Ok(SearchResult::ValueData(current_path, value_name));
+                                                    matching_value = Some(value);
                                                 }
                                             }
                                         }
@@ -288,8 +248,9 @@ impl RegistryHive {
                                         if let Ok(value) = value.data() {
                                             match value {
                                                 KeyValueData::Small(bytes) => {
-                                                    if search_regex.is_match(&String::from_utf8_lossy(bytes)) {
-                                                        return Ok(SearchResult::ValueData(current_path.clone(), value_name));
+                                                    let value = String::from_utf8_lossy(bytes); 
+                                                    if search_regex.is_match(&value) {
+                                                        matching_value = Some(value.to_string());
                                                     }
                                                 }
         
@@ -298,8 +259,9 @@ impl RegistryHive {
                                                         match bytes_result {
                                                             Err(why) => return Err(anyhow!(why)),
                                                             Ok(bytes) => {
-                                                                if search_regex.is_match(&String::from_utf8_lossy(bytes)) {
-                                                                    return Ok(SearchResult::ValueData(current_path.clone(), value_name));
+                                                                let value = String::from_utf8_lossy(bytes); 
+                                                                if search_regex.is_match(&value) {
+                                                                    matching_value = Some(value.to_string());
                                                                 }
                                                             }
                                                         }
@@ -310,13 +272,34 @@ impl RegistryHive {
                                     }
                                     _ => ()
                                 }
-
+                                if name_matches {
+                                    match matching_value {
+                                        Some(value) => {
+                                            add_search_result(search_result, SearchResult::ValueNameAndData(current_path.clone(), value_name, value));
+                                        }
+                                        None => {
+                                            add_search_result(search_result, SearchResult::ValueName(current_path.clone(), value_name));
+                                        }
+                                    }
+                                } else {
+                                    if let Some(value) = matching_value {
+                                        add_search_result(search_result, SearchResult::ValueData(current_path.clone(), value_name, value));
+                                    }
+                                }
                             }
                         }
                     }
                 }
             }
         }
-        Ok(SearchResult::None)
+        Ok(())
     }
+}
+
+fn add_search_result(target: &mut Vec<SearchResult>, search_result: SearchResult) -> Result<()> {
+    if target.len() > 999 {
+        return Err(anyhow!(SearchError::TooManyResults));
+    }
+    target.push(search_result);
+    Ok(())
 }

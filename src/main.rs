@@ -6,6 +6,7 @@ mod registry_hive;
 mod keys_line;
 mod values_line;
 mod mmap_byteslice;
+mod search_result;
 
 use regviewapplication::*;
 
