@@ -49,12 +49,6 @@ impl ValuesLine {
             datatype: datatype.to_owned()
         })
     }
-
-    pub fn new(name: String, data: String, datatype: String) -> Self {
-        Self {
-            name, data, datatype
-        }
-    }
 }
 
 impl TableViewItem<ValuesColumn> for ValuesLine {

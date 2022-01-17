@@ -1,9 +1,8 @@
 use anyhow::Result;
-use cursive::backend::Backend;
-use cursive::{event, View};
+use cursive::event;
 use cursive::menu::MenuTree;
 use cursive::view::{Nameable, Resizable, SizeConstraint, Selector};
-use cursive::views::{DummyView, ProgressBar};
+use cursive::views::DummyView;
 use cursive::Cursive;
 use cursive::{
     views::{Dialog, EditView, LinearLayout, OnEventView, Panel, ResizedView, TextView, ViewRef},
@@ -21,7 +20,6 @@ use crate::search_result::*;
 static NAME_KEYS_TABLE: &str = "keys_table";
 static NAME_VALUES_TABLE: &str = "values_table";
 static NAME_PATH_LINE: &str = "path_line";
-static NAME_DEBUG_VIEW: &str = "debug_view";
 static NAME_SEARCH_REGEX: &str = "search_regex";
 static NAME_SEARCH_RESULTS: &str = "search_results";
 static NAME_SEARCH_PANEL: &str = "search_panel";
@@ -195,8 +193,6 @@ impl UIMain {
                     }
                 };
 
-                let user_data: &mut RegviewUserdata = siv.user_data().unwrap();
-                let hive = &user_data.hive;
                 siv.call_on_name(NAME_SEARCH_RESULTS, |sr_table: &mut TableView<SearchResultLine, SearchResultColumns>| {
                     sr_table.clear();
                     sr_table.set_items(search_result.into_iter().map(SearchResultLine::from).collect());
@@ -248,11 +244,19 @@ impl UIMain {
         let displayed_path = selected_line.path.join("\\");
         let my_key = selected_line.path.pop();
 
-        let user_data: &mut RegviewUserdata = siv.user_data().unwrap();
-        let hive = &user_data.hive;
+        let new_items = {
+            let user_data: &mut RegviewUserdata = siv.user_data().unwrap();
+            let hive = &user_data.hive;
+            hive.borrow_mut().select_path(&selected_line.path)
+        };
 
-        // FIXME: this unwrap may crash
-        let new_items = hive.borrow_mut().select_path(&selected_line.path).unwrap();
+        let new_items = match new_items {
+            Ok(new_items) => new_items,
+            Err(why) => {
+                Self::display_error(siv, why);
+                return;
+            }
+        };
 
         let mut keys_table: ViewRef<TableView<KeysLine, KeysColumn>> =
         siv.find_name(NAME_KEYS_TABLE).unwrap();

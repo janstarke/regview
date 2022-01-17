@@ -1,6 +1,6 @@
 [package]
 name = "regview"
-version = "0.1.3"
+version = "0.1.4"
 edition = "2018"
 description = "Offline-viewer for registry files"
 homepage = "https://www.github.com/janstarke/regview"
