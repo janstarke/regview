@@ -72,22 +72,67 @@ impl RegistryHive {
         Ok(keys)
     }
 
+    fn path_is_valid(&self) -> bool {
+        self.is_path_valid(&self.path)
+    }
+
+    fn is_path_valid(&self, path: &Vec<String>) -> bool {
+        if let Ok(root) = self.hive.root_key_node() {
+            if let Some(child_result) = root.subpath(&path.join("\\")) {
+                return matches!(child_result, Ok(_));
+            }
+        }
+        return false;
+    }
+
     pub fn leave(&mut self) -> Result<Vec<KeysLine>> {
+        assert!(self.path_is_valid());
         if ! self.path.is_empty() {
             self.path.pop();
         }
         
-        self.current_keys()
+        let result = self.current_keys();
+        assert!(self.path_is_valid());
+        result
     }
 
     pub fn enter(&mut self, item_name: &str) -> Result<Vec<KeysLine>> {
+        assert!(self.path_is_valid());
+
         self.path.push(item_name.to_owned());
-        self.current_keys()
+        match self.current_keys() {
+            Err(why) => {
+                self.path.pop();
+                assert!(self.path_is_valid());
+                Err(why)
+            }
+            Ok(children) => {
+                assert!(self.path_is_valid());
+                Ok(children)
+            }
+        }
     }
 
     pub fn select_path(&mut self, path: &Vec<String>) -> Result<Vec<KeysLine>> {
+        assert!(self.path_is_valid());
+
+        if ! self.is_path_valid(path) {
+            return Err(anyhow!("invalid path specified: '{}'", path.join("\\")));
+        }
+
         self.path = path.clone();
-        self.current_keys()
+        
+        match self.current_keys() {
+            Err(why) => {
+                self.path.pop();
+                assert!(self.path_is_valid());
+                Err(why)
+            }
+            Ok(children) => {
+                assert!(self.path_is_valid());
+                Ok(children)
+            }
+        }
     }
 
     pub fn selected_node(&self) -> Option<String> {
@@ -106,7 +151,7 @@ impl RegistryHive {
                 Ok(node) => node,
             }
         };
-        
+
         if let Some(values_result) = current_node.values() {
             match values_result {
                 Err(why) => {return Err(anyhow!(why));}
