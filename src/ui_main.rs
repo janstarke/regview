@@ -199,37 +199,6 @@ impl UIMain {
 
                 });
                 let _ = siv.focus(&Selector::Name(NAME_SEARCH_RESULTS));
-
-/*
-                let new_items = match new_items {
-                    Ok(items) => items,
-                    Err(why) => {
-                        UIMain::display_error(siv, why);
-                        return;
-                    }
-                };
-                let key_name = path.last().and_then(|s| Some(s.to_owned()));
-
-                let mut keys_table: ViewRef<TableView<KeysLine, KeysColumn>> =
-                    siv.find_name(NAME_KEYS_TABLE).unwrap();
-                keys_table.clear();
-
-                let selection_index = if let Some(kn) = key_name.as_ref() {
-                    new_items.iter().position(|i| i.name() == kn)
-                } else {
-                    None
-                };
-
-                keys_table.set_items(new_items);
-                if let Some(index) = selection_index {
-                    keys_table.set_selected_item(index);
-                }
-                keys_table.sort();
-
-                siv.call_on_name(NAME_PATH_LINE, |l: &mut TextView| {
-                    l.set_content(path.join("\\"))
-                });
-                */
             }
         }
     }
@@ -322,16 +291,7 @@ impl UIMain {
                 hive.borrow_mut().enter(selected_node.name()).unwrap()
             }
         };
-/*
-        if selected_node.is_parent() {
 
-        } else {
-            siv.call_on_name(
-                NAME_VALUES_TABLE,
-                |values_table: &mut TableView<ValuesLine, ValuesColumn>| values_table.clear(),
-            );
-        }
-*/
         keys_table.clear();
         let selection_index = if select_node {
             new_items
