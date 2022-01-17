@@ -245,6 +245,7 @@ impl UIMain {
             Some(item) => item.clone()
         };
 
+        let displayed_path = selected_line.path.join("\\");
         let my_key = selected_line.path.pop();
 
         let user_data: &mut RegviewUserdata = siv.user_data().unwrap();
@@ -263,14 +264,35 @@ impl UIMain {
         };
 
         keys_table.set_items(new_items);
-        if let Some(index) = selection_index {
+        let selected_item = if let Some(index) = selection_index {
             keys_table.set_selected_item(index);
-        }
-        keys_table.sort();
+            keys_table.borrow_item(index) 
+        } else { None };
 
         siv.call_on_name(NAME_PATH_LINE, |l: &mut TextView| {
-            l.set_content(selected_line.path.join("\\"))
+            l.set_content(displayed_path)
         });
+
+
+        let new_items = match selected_item {
+            None => Vec::new(),
+            Some(item) => {
+                if item.is_parent() {
+                    vec![]
+                } else {
+                    let user_data: &RegviewUserdata = siv.user_data().unwrap();
+                    let hive = &user_data.hive;
+                    hive.borrow().key_values(item.name()).unwrap()
+                }
+            }
+        };
+
+        let mut values_table: ViewRef<TableView<ValuesLine, ValuesColumn>> =
+            siv.find_name(NAME_VALUES_TABLE).unwrap();
+        values_table.clear();
+        values_table.set_items(new_items);
+
+        keys_table.sort();
 
     }
 
