@@ -98,7 +98,15 @@ impl RegistryHive {
         
         let mut value_list = Vec::new();
         let root = self.hive.root_key_node()?;
-        let current_node = root.subpath(&(self.path() + "\\" + record_name)).unwrap()?;
+
+        let current_node = match root.subpath(&(self.path() + "\\" + record_name)) {
+            None => return Err(anyhow!("the node with path '{}' contains no children", &(self.path() + "\\" + record_name))),
+            Some(node_result) => match node_result {
+                Err(why) => return Err(anyhow!(why)),
+                Ok(node) => node,
+            }
+        };
+        
         if let Some(values_result) = current_node.values() {
             match values_result {
                 Err(why) => {return Err(anyhow!(why));}

@@ -283,12 +283,26 @@ impl UIMain {
 
         let new_items = if selected_node.is_parent() {
             select_node = select_node & true;
-            hive.borrow_mut().leave().unwrap()
+            let result = hive.borrow_mut().leave();
+            match result {
+                Err(why) => {
+                    Self::display_error(siv, why);
+                    return;
+                }
+                Ok(value) => value
+            }
         } else {
             if selected_node.is_leaf_node() {
                 return;
             } else {
-                hive.borrow_mut().enter(selected_node.name()).unwrap()
+                let result = hive.borrow_mut().enter(selected_node.name());
+                match result  {
+                    Err(why) => {
+                        Self::display_error(siv, why);
+                        return;
+                    }
+                    Ok(value) => value
+                }
             }
         };
 
@@ -324,7 +338,15 @@ impl UIMain {
                 } else {
                     let user_data: &RegviewUserdata = siv.user_data().unwrap();
                     let hive = &user_data.hive;
-                    hive.borrow().key_values(item.name()).unwrap()
+
+                    let key_values = hive.borrow().key_values(item.name());
+                    match key_values {
+                        Err(why) => {
+                            Self::display_error(siv, why);
+                            return;
+                        }
+                        Ok(value) => value
+                    }
                 }
             }
         };
