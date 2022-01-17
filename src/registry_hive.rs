@@ -173,11 +173,10 @@ impl RegistryHive {
     pub fn find_regex(&mut self, search_regex: &str) -> Result<Vec<SearchResult>> {
         let regex = Regex::new(search_regex)?;
         let root = self.hive.root_key_node()?;
-        let current_node = root.subpath(&(self.path())).unwrap()?;
         let mut search_result = Vec::new();
         let mut current_path = Vec::new();
         
-        self.find_here_and_below(&mut current_path, &current_node, &regex, &mut search_result)?;
+        self.find_here_and_below(&mut current_path, &root, &regex, &mut search_result)?;
         if search_result.is_empty() {
             return Err(anyhow!(SearchError::NoResult));
         } else {
