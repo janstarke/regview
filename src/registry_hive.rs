@@ -1,15 +1,15 @@
-use std::fs::File;
 use anyhow::{anyhow, Result};
 use regex::Regex;
+use std::cell::RefCell;
+use std::fs::File;
+use std::rc::Rc;
 use thiserror::Error;
 
-use memmap::MmapOptions;
-use nt_hive::{Hive, KeyNode, KeyValueData, KeyValueDataType};
+use nt_hive2::{Hive, KeyNode, RegistryValue, SubPath};
 
 use crate::keys_line::KeysLine;
-use crate::values_line::ValuesLine;
-use crate::mmap_byteslice::MmapByteSlice;
 use crate::search_result::SearchResult;
+use crate::values_line::ValuesLine;
 
 #[derive(Error, Debug)]
 pub enum SearchError {
@@ -17,57 +17,44 @@ pub enum SearchError {
     NoResult,
 
     #[error("Too many results found.")]
-    TooManyResults
+    TooManyResults,
 }
 
-pub struct RegistryHive {
-    hive: Hive<MmapByteSlice>,
+pub struct RegistryHive
+{
+    hive: RefCell<Hive<File>>,
     path: Vec<String>,
 }
 
 impl RegistryHive {
-    pub fn new(hive_file: File, omit_validation: bool) -> Result<Self> {
-        let mmap = unsafe { MmapOptions::new().map(&hive_file)? };
-        let slice = MmapByteSlice::new(mmap);
-        let hive = if omit_validation{
-            Hive::without_validation(slice)?
-        } else {
-            Hive::new(slice)?
-        };
-        Ok(Self {
-            hive,
-            path: vec![],
+    pub fn new(hive_file: File) -> Result<Self> {
+        let hive = Hive::new(hive_file)?;
+        Ok(Self { 
+            hive:RefCell::new(hive),
+            path: vec![] 
         })
     }
 
-    pub fn path(&self) -> String {
-        self.path.join("\\")
+    pub fn path(&self) -> &Vec<String> {
+        &self.path
     }
 
     pub fn current_keys(&self) -> Result<Vec<KeysLine>> {
         let mut keys = vec![KeysLine::parent()];
-        let root = self.hive.root_key_node()?;
-        let current_node = 
-        match root.subpath(&self.path()) {
-            None => {return Err(anyhow!("current path is invalid: '{}'", self.path()));}
-            Some(node_result) => {match node_result {
-                Err(why) => { return Err(anyhow!(why)); }
-                Ok(node) => node
-            }}
-        };
-
-        if let Some(subkeys_result) = current_node.subkeys() {
-            match subkeys_result {
-                Err(why) => {return Err(anyhow!(why));}
-                Ok(subkeys) => {
-                    for skn in subkeys {
-                        match skn {
-                            Err(why) => {return Err(anyhow!(why));}
-                            Ok(k) => {keys.push(KeysLine::from(k)?);}
-                        }
-                    }
+        let root = self.hive.borrow_mut().root_key_node()?;
+        let current_node = match root.subpath(self.path(), &mut self.hive.borrow_mut())? {
+            None => {
+                if self.path().is_empty() {
+                    Rc::new(RefCell::new(root))
+                } else {
+                    return Err(anyhow!("current path is invalid: '{:?}'", self.path()));
                 }
             }
+            Some(node_result) => node_result
+        };
+
+        for skn in current_node.borrow().subkeys(&mut self.hive.borrow_mut())?.iter() {
+            keys.push(KeysLine::from(&skn));
         }
         Ok(keys)
     }
@@ -77,9 +64,16 @@ impl RegistryHive {
     }
 
     fn is_path_valid(&self, path: &Vec<String>) -> bool {
-        if let Ok(root) = self.hive.root_key_node() {
-            if let Some(child_result) = root.subpath(&path.join("\\")) {
-                return matches!(child_result, Ok(_));
+        let mut mut_hive = self.hive.borrow_mut();
+        
+        if path.is_empty() {
+            return true;
+        }
+
+        if let Ok(root) = mut_hive.root_key_node() {
+            match root.subpath(path, &mut mut_hive) {
+                Ok(Some(_)) => return true,
+                _ => return false
             }
         }
         return false;
@@ -87,17 +81,17 @@ impl RegistryHive {
 
     pub fn leave(&mut self) -> Result<Vec<KeysLine>> {
         assert!(self.path_is_valid());
-        if ! self.path.is_empty() {
+        if !self.path.is_empty() {
             self.path.pop();
         }
-        
+
         let result = self.current_keys();
         assert!(self.path_is_valid());
         result
     }
 
     pub fn enter(&mut self, item_name: &str) -> Result<Vec<KeysLine>> {
-        assert!(self.path_is_valid());
+        assert!(self.path_is_valid(), "invalid path: '{:?}'", self.path);
 
         self.path.push(item_name.to_owned());
         match self.current_keys() {
@@ -116,12 +110,12 @@ impl RegistryHive {
     pub fn select_path(&mut self, path: &Vec<String>) -> Result<Vec<KeysLine>> {
         assert!(self.path_is_valid());
 
-        if ! self.is_path_valid(path) {
+        if !self.is_path_valid(path) {
             return Err(anyhow!("invalid path specified: '{}'", path.join("\\")));
         }
 
         self.path = path.clone();
-        
+
         match self.current_keys() {
             Err(why) => {
                 self.path.pop();
@@ -136,46 +130,39 @@ impl RegistryHive {
     }
 
     pub fn selected_node(&self) -> Option<String> {
-        self.path.last().and_then(|s|Some(s.to_owned()))
+        self.path.last().and_then(|s| Some(s.to_owned()))
     }
 
     pub fn key_values(&self, record_name: &str) -> Result<Vec<ValuesLine>> {
-        
         let mut value_list = Vec::new();
-        let root = self.hive.root_key_node()?;
+        let root = self.hive.borrow_mut().root_key_node()?;
 
-        let current_node = match root.subpath(&(self.path() + "\\" + record_name)) {
-            None => return Err(anyhow!("the node with path '{}' contains no children", &(self.path() + "\\" + record_name))),
-            Some(node_result) => match node_result {
-                Err(why) => return Err(anyhow!(why)),
-                Ok(node) => node,
-            }
-        };
-
-        if let Some(values_result) = current_node.values() {
-            match values_result {
-                Err(why) => {return Err(anyhow!(why));}
-                Ok(values) => {
-                    for value in values {
-                        match value {
-                            Err(why) => {return Err(anyhow!(why));}
-                            Ok(value) => {
-                                value_list.push(ValuesLine::from(&value)?);
-                            }
-                        }
-                    }
+        let current_node = match root.subpath(&(self.path().join("\\") + "\\" + record_name), &mut self.hive.borrow_mut())? {
+            None => {
+                if self.path().is_empty() {
+                    Rc::new(RefCell::new(root))
+                } else {
+                    return Err(anyhow!(
+                        "the node with path '{}' contains no children",
+                        &(self.path().join("\\") + "\\" + record_name)
+                    ))
                 }
             }
+            Some(node) => node
+        };
+
+        for value in current_node.borrow().values() {
+            value_list.push(ValuesLine::from(&value)?);
         }
         Ok(value_list)
     }
 
     pub fn find_regex(&mut self, search_regex: &str) -> Result<Vec<SearchResult>> {
         let regex = Regex::new(search_regex)?;
-        let root = self.hive.root_key_node()?;
+        let root = self.hive.borrow_mut().root_key_node()?;
         let mut search_result = Vec::new();
         let mut current_path = Vec::new();
-        
+
         self.find_here_and_below(&mut current_path, &root, &regex, &mut search_result)?;
         if search_result.is_empty() {
             return Err(anyhow!(SearchError::NoResult));
@@ -184,31 +171,34 @@ impl RegistryHive {
         }
     }
 
-    fn find_here_and_below(&self,
-                            current_path: &mut Vec<String>,
-                            current_node: &KeyNode<&Hive<MmapByteSlice>, MmapByteSlice>,
-                            search_regex: &Regex,
-                            search_result: &mut Vec<SearchResult>) -> Result<()> {
+    fn find_here_and_below (
+        &self,
+        current_path: &mut Vec<String>,
+        current_node: &KeyNode,
+        search_regex: &Regex,
+        search_result: &mut Vec<SearchResult>,
+    ) -> Result<()> {
         self.find_in_this_node(current_path, current_node, search_regex, search_result)?;
         self.find_in_subkeys_of(current_path, &current_node, search_regex, search_result)?;
         Ok(())
     }
 
-    fn find_in_this_node(&self,
-                        current_path: &mut Vec<String>,
-                        current_node: &KeyNode<&Hive<MmapByteSlice>, MmapByteSlice>,
-                        search_regex: &Regex,
-                        search_result: &mut Vec<SearchResult>) -> Result<()> {
-        let subkey_name = current_node.name()?.to_string_lossy();
-        
+    fn find_in_this_node(
+        &self,
+        current_path: &mut Vec<String>,
+        current_node: &KeyNode,
+        search_regex: &Regex,
+        search_result: &mut Vec<SearchResult>,
+    ) -> Result<()> {
+        let subkey_name = current_node.name();
+
         /*
          * key name matches
          */
         if search_regex.is_match(&subkey_name) {
             let current_path = current_path.clone();
-            search_result.push(SearchResult::KeyName(current_path));
+            search_result.push(SearchResult::KeyName(current_path.clone()));
         }
-
 
         /*
          * check attributes
@@ -216,135 +206,106 @@ impl RegistryHive {
         self.find_in_attributes(current_path, &current_node, search_regex, search_result)
     }
 
-    fn find_in_subkeys_of(&self,
-                        current_path: &mut Vec<String>,
-                        current_node: &KeyNode<&Hive<MmapByteSlice>, MmapByteSlice>,
-                        search_regex: &Regex,
-                        search_result: &mut Vec<SearchResult>) -> Result<()> {
-        if let Some(subkeys_result) = current_node.subkeys() {
-            match subkeys_result {
-                Err(why) => {return Err(anyhow!(why));}
-                Ok(subkeys) => {
-                    for subkey_result in subkeys {
-                        match subkey_result {
-                            Err(why) => {return Err(anyhow!(why));}
-                            Ok(subkey) => {
-                                let subkey_name = subkey.name()?.to_string_lossy();
-                                current_path.push(subkey_name);
-                                self.find_here_and_below(current_path, &subkey, search_regex, search_result)?;
-                                current_path.pop();
-                            }
-                        }
-                    }
-                }
-            }
+    fn find_in_subkeys_of(
+        &self,
+        current_path: &mut Vec<String>,
+        current_node: &KeyNode,
+        search_regex: &Regex,
+        search_result: &mut Vec<SearchResult>,
+    ) -> Result<()> {
+        for subkey in current_node.subkeys(&mut self.hive.borrow_mut())?.iter() {
+            let subkey_name = subkey.borrow().name().to_owned();
+            current_path.push(subkey_name);
+            self.find_here_and_below(
+                current_path,
+                &subkey.borrow(),
+                search_regex,
+                search_result,
+            )?;
+            current_path.pop();
         }
         Ok(())
     }
 
-    fn find_in_attributes(&self,
-                            current_path: &mut Vec<String>,
-                            current_node: &KeyNode<&Hive<MmapByteSlice>, MmapByteSlice>,
-                            search_regex: &Regex,
-                            search_result: &mut Vec<SearchResult>) -> Result<()> {
-        if let Some(values_result) = current_node.values() {
-            match values_result {
-                Err(why) => {return Err(anyhow!(why));}
-                Ok(values) => {
-                    for value_result in values {
-                        match value_result {
-                            Err(why) => {return Err(anyhow!(why));}
-                            Ok(value) => {
-                                let value_name = value.name()?.to_string_lossy();
-                                /*
-                                 * value name matches
-                                 */
-                                let name_matches = 
-                                if search_regex.is_match(&value_name) {
-                                    true
-                                } else {
-                                    false
-                                };
+    fn find_in_attributes(
+        &self,
+        current_path: &mut Vec<String>,
+        current_node: &KeyNode,
+        search_regex: &Regex,
+        search_result: &mut Vec<SearchResult>,
+    ) -> Result<()> {
+        for value in current_node.values() {
 
-                                let mut matching_value = None;
-                                match value.data_type()? {
+            /*
+             * value name matches
+             */
+            let name_matches = search_regex.is_match(value.name());
+            
+            let matching_value =
+            match value.value() {
+                RegistryValue::RegSZ(val) |
+                RegistryValue::RegExpandSZ(val) |
+                RegistryValue::RegLink(val) |
+                RegistryValue::RegResourceList(val) |
+                RegistryValue::RegFullResourceDescriptor(val) |
+                RegistryValue::RegResourceRequirementsList(val)
+                    => search_regex.is_match(val).then_some(val.to_owned()),
 
-                                    /*
-                                     * value data matches (REG_SZ, REG_EXPAND_SZ)
-                                     */
-                                    KeyValueDataType::RegSZ | KeyValueDataType::RegExpandSZ => {
-                                        let value = value.string_data()?;
-                                            if search_regex.is_match(&value) {
-                                                matching_value = Some(value);
-                                            } 
-                                    }
-
-                                    /*
-                                     * value data matches (REG_MULTI_SZ)
-                                     */
-                                    KeyValueDataType::RegMultiSZ => {
-                                        if let Ok(values) = value.multi_string_data() {
-                                            for value in values {
-                                                if search_regex.is_match(&value) {
-                                                    matching_value = Some(value);
-                                                }
-                                            }
-                                        }
-                                    }
-
-                                    /*
-                                    * search in binary data
-                                    */
-                                    KeyValueDataType::RegBinary => {
-                                        if let Ok(value) = value.data() {
-                                            match value {
-                                                KeyValueData::Small(bytes) => {
-                                                    let value = String::from_utf8_lossy(bytes); 
-                                                    if search_regex.is_match(&value) {
-                                                        matching_value = Some(value.to_string());
-                                                    }
-                                                }
-        
-                                                KeyValueData::Big(slice) => {
-                                                    for bytes_result in slice {
-                                                        match bytes_result {
-                                                            Err(why) => return Err(anyhow!(why)),
-                                                            Ok(bytes) => {
-                                                                let value = String::from_utf8_lossy(bytes); 
-                                                                if search_regex.is_match(&value) {
-                                                                    matching_value = Some(value.to_string());
-                                                                }
-                                                            }
-                                                        }
-                                                    }
-                                                }
-                                            }
-                                        }
-                                    }
-                                    _ => ()
-                                }
-                                if name_matches {
-                                    match matching_value {
-                                        Some(value) => {
-                                            add_search_result(search_result, SearchResult::ValueNameAndData(current_path.clone(), value_name, value))?;
-                                        }
-                                        None => {
-                                            add_search_result(search_result, SearchResult::ValueName(current_path.clone(), value_name))?;
-                                        }
-                                    }
-                                } else {
-                                    if let Some(value) = matching_value {
-                                        add_search_result(search_result, SearchResult::ValueData(current_path.clone(), value_name, value))?;
-                                    }
-                                }
-                            }
-                        }
-                    }
+                RegistryValue::RegDWord(val)  |
+                RegistryValue::RegDWordBigEndian(val) => {
+                    let val = format!("0x{:08X}", val);
+                    search_regex.is_match(&val).then_some(val)
                 }
+
+                RegistryValue::RegQWord(val) => {
+                    let val = format!("0x{:016X}", val);
+                    search_regex.is_match(&val).then_some(val)
+                }
+
+                RegistryValue::RegBinary(val) => {
+                    let val = String::from_utf8_lossy(val).to_string();
+                    search_regex.is_match(&val).then_some(val)
+                }
+                RegistryValue::RegMultiSZ(val)
+                    => val.iter().find(|s| search_regex.is_match(s)).map(|s| s.to_owned()),
+                
+                _ => None,
+            };
+
+            match (name_matches, matching_value, ) {
+                (true, Some(v)) => add_search_result(
+                    search_result, 
+                    SearchResult::ValueNameAndData(current_path.clone(), value.name().to_owned(), v))?,
+                (true, None) => add_search_result(
+                    search_result,
+                    SearchResult::ValueName(current_path.clone(), value.name().to_owned()))?,
+                (false, Some(v)) => add_search_result(
+                    search_result,
+                    SearchResult::ValueData(current_path.clone(), value.name().to_owned(), v),
+                )?,
+                (false, None) => (),
             }
         }
         Ok(())
     }
+}
+
+trait ThenSome<'a, 'b, T> where T: 'b {
+    fn then_some(&'a self, v: T) -> Option<T>;
+}
+
+impl<'a, 'b> ThenSome<'a, 'b, String> for bool {
+    fn then_some(&'a self, v: String) -> Option<String> {
+        if *self {
+            Some(v)
+        } else {
+            None
+        }
+    }
+}
+
+fn owned_path(path: &Vec<&str>) -> Vec<String> {
+    path.iter().map(|s|(*s).to_owned()).collect()
 }
 
 fn add_search_result(target: &mut Vec<SearchResult>, search_result: SearchResult) -> Result<()> {

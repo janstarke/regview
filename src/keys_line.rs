@@ -1,8 +1,9 @@
-use cursive_table_view::TableViewItem;
-use nt_hive::{Hive, KeyNode};
-use anyhow::{Result, anyhow};
+use std::{rc::Rc, cell::RefCell};
 
-use crate::mmap_byteslice::MmapByteSlice;
+use cursive_table_view::TableViewItem;
+use anyhow::{Result};
+use nt_hive2::{KeyNode, Hive};
+use binread::BinReaderExt;
 
 #[derive(Copy, Clone, PartialEq, Eq, Hash)]
 pub enum KeysColumn {
@@ -13,30 +14,22 @@ pub enum KeysColumn {
 
 #[derive(Clone)]
 pub struct KeysLine {
+    //record: KeyNode,
     name: String,
     is_parent: bool,
     is_leaf_node: bool
 }
 
 impl KeysLine {
-    pub fn from(nk: KeyNode<&Hive<MmapByteSlice>, MmapByteSlice>) -> Result<Self> {
-        let name = nk.name()?.to_string_lossy();
+    pub fn from(nk: &Rc<RefCell<KeyNode>>) -> Self {
+        let name = nk.borrow().name().to_owned();
         //let timestamp = nk.borrow().get_last_written().clone();
-        let subkey_count = match nk.subkeys() {
-            None => 0,
-            Some(subkeys_result) => {
-                match subkeys_result {
-                    Err(why) => {return Err(anyhow!(why));}
-                    Ok(subkeys) => subkeys.count()
-                }
-            }
-        };
-        Ok(Self {
-            //record: Some(nk),
+        Self {
+            //record: nk,
             name: name,
             is_parent: false,
-            is_leaf_node: subkey_count == 0
-        })
+            is_leaf_node: nk.borrow().subkey_count() == 0
+        }
     }
 
     pub fn parent() -> Self {
@@ -51,12 +44,11 @@ impl KeysLine {
     pub fn is_parent(&self) -> bool {
         self.is_parent
     }
-/*
-    pub fn record(&self) -> Rc<RefCell<KeyNode<&'a Hive<&'a [u8]>, &'a [u8]>>> {
+/* 
+    pub fn record(&self) -> Rc<RefCell<KeyNode>> {
         Rc::clone(&self.record.as_ref().unwrap())
     }
-    */
-
+*/
     pub fn name(&self) -> &str {
         &self.name
     }

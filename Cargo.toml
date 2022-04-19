@@ -17,7 +17,7 @@ cursive = "0.16"
 cursive_table_view = "0.13"
 memmap = "0.7"
 cursive-flexi-logger-view = "^0"
-nt-hive = {path="extern/nt-hive", version="0.2.1"}
-zerocopy = {path="extern/zerocopy-0.6.1", version="0.6.2"}
+nt_hive2 = {path="../nt-hive2", version="0.1.0"}
 regex = "1.5"
 thiserror = "1.0"
+binread = "2.2"

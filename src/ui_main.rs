@@ -321,7 +321,7 @@ impl UIMain {
         }
         keys_table.sort();
 
-        let path = hive.borrow().path();
+        let path = hive.borrow().path().join("\\");
         siv.call_on_name(NAME_PATH_LINE, |l: &mut TextView| l.set_content(path));
 
     }

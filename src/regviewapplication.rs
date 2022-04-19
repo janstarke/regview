@@ -34,13 +34,6 @@ impl RegViewApplication {
                     .multiple(false)
                     .takes_value(true),
             )
-            .arg(
-                Arg::with_name("OMIT_VALIDATION")
-                    .long("omit-validation")
-                    .help("omit validation")
-                    .required(false)
-                    .takes_value(false)
-            )
             ;
         
         let matches = app.get_matches();
@@ -52,7 +45,7 @@ impl RegViewApplication {
             File::open(fp)?
         };
         Ok(Self {
-            hive: Rc::new(RefCell::new(RegistryHive::new(reg_file, matches.is_present("OMIT_VALIDATION"))?))
+            hive: Rc::new(RefCell::new(RegistryHive::new(reg_file)?))
         })
     }
 }

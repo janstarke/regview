@@ -1,8 +1,6 @@
 use cursive_table_view::TableViewItem;
 use anyhow::Result;
-use nt_hive::{Hive, KeyValue, KeyValueData, KeyValueDataType};
-
-use crate::mmap_byteslice::MmapByteSlice;
+use nt_hive2::{KeyValue, RegistryValue};
 
 #[derive(Copy, Clone, PartialEq, Eq, Hash)]
 pub enum ValuesColumn {
@@ -18,33 +16,42 @@ pub struct ValuesLine {
     datatype: String
 }
 
-fn binary_data(data: &KeyValue<&Hive<MmapByteSlice>, MmapByteSlice>) -> String {
-    match data.data().unwrap() {
-        KeyValueData::Small(v) => format!("{:X?}", v),
-        KeyValueData::Big(_) => "BigDataSlices unsupported".to_owned()
-    }
-}
-
 impl ValuesLine {
-    pub fn from(value: &KeyValue<&Hive<MmapByteSlice>, MmapByteSlice>) -> Result<Self> {
+    pub fn from(value: &KeyValue) -> Result<Self> {
         let (datatype, data) = 
-        match value.data_type()? {
-            KeyValueDataType::RegNone => ("RegNone", "".to_owned()),
-            KeyValueDataType::RegSZ=> ("RegSZ", value.string_data()?),
-            KeyValueDataType::RegExpandSZ=> ("RegExpandSZ", value.string_data()?),
-            KeyValueDataType::RegBinary=> ("RegBinary", binary_data(value)),
-            KeyValueDataType::RegDWord=> ("RegDWord", format!("0x{:08x}", value.dword_data()?)),
-            KeyValueDataType::RegDWordBigEndian=> ("RegDWordBigEndian", format!("0x{:08X}", u32::from_be(value.dword_data()?))),
-            KeyValueDataType::RegLink=> ("RegLink", "not supported".to_owned()),
-            KeyValueDataType::RegMultiSZ=> ("RegMultiSZ", value.multi_string_data()?.join("|")),
-            KeyValueDataType::RegResourceList=> ("RegResourceList", "not supported".to_owned()),
-            KeyValueDataType::RegFullResourceDescriptor=> ("RegFullResourceDescriptor", "not supported".to_owned()),
-            KeyValueDataType::RegResourceRequirementsList=> ("RegResourceRequirementsList", "not supported".to_owned()),
-            KeyValueDataType::RegQWord=> ("RegQWord", format!("0x{:016x}", value.qword_data()?)),
+        match &value.value() {
+            RegistryValue::RegNone 
+                => ("RegNone", "".to_owned()),
+            RegistryValue::RegUnknown 
+                => ("RegUnknown", "".to_owned()),
+            RegistryValue::RegSZ(val) 
+                => ("RegSZ", val.to_owned()),
+            RegistryValue::RegExpandSZ(val) 
+                => ("RegExpandSZ", val.to_owned()),
+            RegistryValue::RegBinary(val) 
+                => ("RegBinary", format!("{:X?}", val)),
+            RegistryValue::RegDWord(val) 
+                => ("RegDWord", format!("0x{:08x}", val)),
+            RegistryValue::RegDWordBigEndian(val) 
+                => ("RegDWordBigEndian", format!("0x{:08X}", u32::from_be(*val))),
+            RegistryValue::RegLink(val) 
+                => ("RegLink", val.to_owned()),
+            RegistryValue::RegMultiSZ(val) 
+                => ("RegMultiSZ", val.join("|")),
+            RegistryValue::RegResourceList(val) 
+                => ("RegResourceList", val.to_owned()),
+            RegistryValue::RegFullResourceDescriptor(val) 
+                => ("RegFullResourceDescriptor", val.to_owned()),
+            RegistryValue::RegResourceRequirementsList(val) 
+                => ("RegResourceRequirementsList", val.to_owned()),
+            RegistryValue::RegQWord(val) 
+                => ("RegQWord", format!("0x{:016x}", val)),
+            RegistryValue::RegFileTime 
+                => ("RegFileTime", "not supported".to_owned()),
         };
 
         Ok(Self {
-            name: value.name()?.to_string_lossy(),
+            name: value.name().to_owned(),
             data,
             datatype: datatype.to_owned()
         })
