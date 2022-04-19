@@ -1,15 +1,15 @@
 use std::{rc::Rc, cell::RefCell};
 
 use cursive_table_view::TableViewItem;
-use anyhow::{Result};
-use nt_hive2::{KeyNode, Hive};
-use binread::BinReaderExt;
+use nt_hive2::KeyNode;
+use chrono::DateTime;
+use chrono::Utc;
 
 #[derive(Copy, Clone, PartialEq, Eq, Hash)]
 pub enum KeysColumn {
     NodeType,
     Name,
-    //LastWritten
+    LastWritten
 }
 
 #[derive(Clone)]
@@ -17,18 +17,20 @@ pub struct KeysLine {
     //record: KeyNode,
     name: String,
     is_parent: bool,
-    is_leaf_node: bool
+    is_leaf_node: bool,
+    last_written: DateTime<Utc>
 }
 
 impl KeysLine {
     pub fn from(nk: &Rc<RefCell<KeyNode>>) -> Self {
         let name = nk.borrow().name().to_owned();
-        //let timestamp = nk.borrow().get_last_written().clone();
+        let last_written = nk.borrow().timestamp().clone();
         Self {
             //record: nk,
             name: name,
             is_parent: false,
-            is_leaf_node: nk.borrow().subkey_count() == 0
+            is_leaf_node: nk.borrow().subkey_count() == 0,
+            last_written
         }
     }
 
@@ -38,7 +40,8 @@ impl KeysLine {
             name: "[..]".to_owned(),
             //timestamp: WinTimestamp::from(0),
             is_parent: true,
-            is_leaf_node: false
+            is_leaf_node: false,
+            last_written: chrono::MIN_DATETIME
         }
     }
     pub fn is_parent(&self) -> bool {
@@ -72,7 +75,13 @@ impl TableViewItem<KeysColumn> for KeysLine {
                 }
             }
             KeysColumn::Name => self.name.to_owned(),
-            //KeysColumn::LastWritten => { panic!("not supported"); }
+            KeysColumn::LastWritten => {
+                if self.last_written == chrono::MIN_DATETIME {
+                    "".to_owned()
+                } else {
+                    self.last_written.format("%F %T").to_string()
+                }
+            }
         }
     }
 
@@ -93,7 +102,7 @@ impl TableViewItem<KeysColumn> for KeysLine {
                 match column {
                     KeysColumn::NodeType => self.is_leaf_node.cmp(&other.is_leaf_node),
                     KeysColumn::Name => self.name.cmp(&other.name),
-                    //KeysColumn::LastWritten => { panic!("not supported"); }
+                    KeysColumn::LastWritten => self.last_written.cmp(&other.last_written),
                 }
             }
         }

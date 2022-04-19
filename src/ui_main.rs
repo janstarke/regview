@@ -53,7 +53,7 @@ impl UIMain {
         let mut keys_table = TableView::<KeysLine, KeysColumn>::new()
             .column(KeysColumn::NodeType, "", |c|{c.width(1)})
             .column(KeysColumn::Name, "Name", |c| {c})
-            //.column(KeysColumn::LastWritten, "Last written", |c| c.width(20))
+            .column(KeysColumn::LastWritten, "Timestamp", |c| {c}.width(20))
         ;
 
         keys_table.set_on_submit(UIMain::on_submit);
@@ -72,7 +72,7 @@ impl UIMain {
                     keys_table
                         .with_name(NAME_KEYS_TABLE)
                         .full_height()
-                        .min_width(48)
+                        .min_width(53)
                         .max_width(64),
                 )
                 .title("Keys"),

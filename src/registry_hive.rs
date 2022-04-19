@@ -24,14 +24,17 @@ pub struct RegistryHive
 {
     hive: RefCell<Hive<File>>,
     path: Vec<String>,
+    root: Rc<RefCell<KeyNode>>,
 }
 
 impl RegistryHive {
     pub fn new(hive_file: File) -> Result<Self> {
-        let hive = Hive::new(hive_file)?;
+        let mut hive = Hive::new(hive_file)?;
+        let root = hive.root_key_node()?;
         Ok(Self { 
             hive:RefCell::new(hive),
-            path: vec![] 
+            path: vec![],
+            root: Rc::new(RefCell::new(root))
         })
     }
 
@@ -39,18 +42,20 @@ impl RegistryHive {
         &self.path
     }
 
+    pub fn root(&self) -> &Rc<RefCell<KeyNode>> {
+        &self.root
+    }
+
     pub fn current_keys(&self) -> Result<Vec<KeysLine>> {
         let mut keys = vec![KeysLine::parent()];
-        let root = self.hive.borrow_mut().root_key_node()?;
-        let current_node = match root.subpath(self.path(), &mut self.hive.borrow_mut())? {
-            None => {
-                if self.path().is_empty() {
-                    Rc::new(RefCell::new(root))
-                } else {
-                    return Err(anyhow!("current path is invalid: '{:?}'", self.path()));
-                }
+        
+        let current_node = if self.path().is_empty() {
+            Rc::clone(self.root())
+        } else {
+            match self.root().borrow().subpath(self.path(), &mut self.hive.borrow_mut())? {
+                None => return Err(anyhow!("current path is invalid: '{:?}'", self.path())),
+                Some(node_result) => node_result
             }
-            Some(node_result) => node_result
         };
 
         for skn in current_node.borrow().subkeys(&mut self.hive.borrow_mut())?.iter() {
@@ -302,10 +307,6 @@ impl<'a, 'b> ThenSome<'a, 'b, String> for bool {
             None
         }
     }
-}
-
-fn owned_path(path: &Vec<&str>) -> Vec<String> {
-    path.iter().map(|s|(*s).to_owned()).collect()
 }
 
 fn add_search_result(target: &mut Vec<SearchResult>, search_result: SearchResult) -> Result<()> {
