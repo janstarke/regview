@@ -6,7 +6,7 @@ Offline-viewer for registry files
 # Usage
 
 ```shell
-regview 0.1.4
+regview 0.2.1
 
 Offline-viewer for registry files
 
@@ -14,7 +14,6 @@ USAGE:
     regview [FLAGS] <REG_FILE>
 
 FLAGS:
-        --omit-validation    omit validation
     -h, --help               Prints help information
     -V, --version            Prints version information
 
