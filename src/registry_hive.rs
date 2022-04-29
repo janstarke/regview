@@ -218,7 +218,11 @@ impl RegistryHive {
         search_regex: &Regex,
         search_result: &mut Vec<SearchResult>,
     ) -> Result<()> {
-        for subkey in current_node.subkeys(&mut self.hive.borrow_mut())?.iter() {
+        let subkeys: Vec<Rc<RefCell<KeyNode>>> = current_node.subkeys(&mut self.hive.borrow_mut())?
+            .iter()
+            .map(|sk| Rc::clone(sk))
+            .collect();
+        for subkey in subkeys {
             let subkey_name = subkey.borrow().name().to_owned();
             current_path.push(subkey_name);
             self.find_here_and_below(
