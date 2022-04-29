@@ -112,6 +112,8 @@ impl RegistryHive {
         }
     }
 
+    /// switches to a specified path and returns the child elements
+    /// of that very path
     pub fn select_path(&mut self, path: &Vec<String>) -> Result<Vec<KeysLine>> {
         assert!(self.path_is_valid());
 

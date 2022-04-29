@@ -260,10 +260,19 @@ impl UIMain {
             }
         };
 
+        let value_index = match selected_line.value_name {
+            None => None,
+            Some(vn) => new_items.iter()
+                .position(|vl| vl.name() == vn)
+        };
+
         let mut values_table: ViewRef<TableView<ValuesLine, ValuesColumn>> =
             siv.find_name(NAME_VALUES_TABLE).unwrap();
         values_table.clear();
         values_table.set_items(new_items);
+        if let Some(vi) = value_index {
+            values_table.set_selected_item(vi);
+        }
 
         keys_table.sort();
 

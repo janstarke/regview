@@ -56,6 +56,18 @@ impl ValuesLine {
             datatype: datatype.to_owned()
         })
     }
+
+    pub fn name(&self) -> &str {
+        &self.name
+    }
+
+    pub fn data(&self) -> &str {
+        &self.data
+    }
+
+    pub fn datatype(&self) -> &str {
+        &self.datatype
+    }
 }
 
 impl TableViewItem<ValuesColumn> for ValuesLine {
