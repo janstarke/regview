@@ -6,7 +6,7 @@ Offline-viewer for registry files
 # Usage
 
 ```shell
-regview 0.2.1
+regview 0.2.2
 
 Offline-viewer for registry files
 
