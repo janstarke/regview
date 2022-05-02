@@ -260,22 +260,22 @@ impl RegistryHive {
                 RegistryValue::RegResourceList(val) |
                 RegistryValue::RegFullResourceDescriptor(val) |
                 RegistryValue::RegResourceRequirementsList(val)
-                    => search_regex.is_match(val).then_some(val.to_owned()),
+                    => search_regex.is_match(val).regview_then_some(val.to_owned()),
 
                 RegistryValue::RegDWord(val)  |
                 RegistryValue::RegDWordBigEndian(val) => {
                     let val = format!("0x{:08X}", val);
-                    search_regex.is_match(&val).then_some(val)
+                    search_regex.is_match(&val).regview_then_some(val)
                 }
 
                 RegistryValue::RegQWord(val) => {
                     let val = format!("0x{:016X}", val);
-                    search_regex.is_match(&val).then_some(val)
+                    search_regex.is_match(&val).regview_then_some(val)
                 }
 
                 RegistryValue::RegBinary(val) => {
                     let val = String::from_utf8_lossy(val).to_string();
-                    search_regex.is_match(&val).then_some(val)
+                    search_regex.is_match(&val).regview_then_some(val)
                 }
                 RegistryValue::RegMultiSZ(val)
                     => val.iter().find(|s| search_regex.is_match(s)).map(|s| s.to_owned()),
@@ -301,12 +301,13 @@ impl RegistryHive {
     }
 }
 
-trait ThenSome<'a, 'b, T> where T: 'b {
-    fn then_some(&'a self, v: T) -> Option<T>;
+/// TODO: replace this with the official ThenSome trait as far as it is stable
+trait RegviewThenSome<'a, 'b, T> where T: 'b {
+    fn regview_then_some(&'a self, v: T) -> Option<T>;
 }
 
-impl<'a, 'b> ThenSome<'a, 'b, String> for bool {
-    fn then_some(&'a self, v: String) -> Option<String> {
+impl<'a, 'b> RegviewThenSome<'a, 'b, String> for bool {
+    fn regview_then_some(&'a self, v: String) -> Option<String> {
         if *self {
             Some(v)
         } else {

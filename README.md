@@ -1,12 +1,12 @@
 # regview
 Offline-viewer for registry files
 
-![](doc/regview_sample.png)
+<img src="https://github.com/janstarke/regview/blob/master/doc/regview_sample.png?raw=true">
 
 # Usage
 
 ```shell
-regview 0.2.2
+regview 0.2.3
 
 Offline-viewer for registry files
 

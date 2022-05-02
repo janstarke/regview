@@ -61,10 +61,12 @@ impl ValuesLine {
         &self.name
     }
 
+    #[allow(dead_code)]
     pub fn data(&self) -> &str {
         &self.data
     }
 
+    #[allow(dead_code)]
     pub fn datatype(&self) -> &str {
         &self.datatype
     }

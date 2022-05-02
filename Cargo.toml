@@ -1,9 +1,9 @@
 [package]
 name = "regview"
-version = "0.2.2"
+version = "0.2.3"
 edition = "2018"
 description = "Offline-viewer for registry files"
-homepage = "https://www.github.com/janstarke/regview"
+repository = "https://www.github.com/janstarke/regview"
 license = "GPL-3.0"
 
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
