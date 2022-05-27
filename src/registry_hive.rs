@@ -39,7 +39,7 @@ impl RegistryHive {
                     std::process::exit(-1);
                 }
             };
-            println!("found offset at {}", offset.0);
+            //println!("found offset at {}", offset.0);
             HiveParseMode::Normal(offset)      
         } else {
             HiveParseMode::NormalWithBaseBlock
