@@ -5,7 +5,7 @@ use std::fs::File;
 use std::rc::Rc;
 use thiserror::Error;
 
-use nt_hive2::{Hive, KeyNode, RegistryValue, SubPath};
+use nt_hive2::{Hive, KeyNode, RegistryValue, SubPath, HiveParseMode};
 
 use crate::keys_line::KeysLine;
 use crate::search_result::SearchResult;
@@ -28,8 +28,24 @@ pub struct RegistryHive
 }
 
 impl RegistryHive {
-    pub fn new(hive_file: File) -> Result<Self> {
-        let mut hive = Hive::new(hive_file)?;
+    pub fn new(hive_file: File, ignore_base_block: bool) -> Result<Self> {
+
+        let parse_mode = if ignore_base_block {
+            let hive = Hive::new(&hive_file, HiveParseMode::Raw).unwrap();
+            let offset = match hive.find_root_celloffset() {
+                Some(offset) => offset,
+                None => {
+                    log::error!("scan found no root cell offset, aborting...");
+                    std::process::exit(-1);
+                }
+            };
+            println!("found offset at {}", offset.0);
+            HiveParseMode::Normal(offset)      
+        } else {
+            HiveParseMode::NormalWithBaseBlock
+        };
+
+        let mut hive = Hive::new(hive_file, parse_mode)?;
         let root = hive.root_key_node()?;
         Ok(Self { 
             hive:RefCell::new(hive),
