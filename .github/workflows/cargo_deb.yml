@@ -1,0 +1,40 @@
+name: Build static Debian package
+on:
+  release:
+    types: [published]
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+    - uses: actions/checkout@master    
+
+    - name: Set env
+      run: echo "RELEASE_VERSION=${GITHUB_REF#refs/*/}" >> $GITHUB_ENV
+    - name: Test
+      run: |
+        echo $RELEASE_VERSION
+        echo ${{ env.RELEASE_VERSION }}
+    
+    - name: Get release
+      id: get_release
+      uses: bruceadams/get-release@v1.2.3
+      env:
+        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        
+    - id: get_version
+      uses: battila7/get-version-action@v2
+    
+    - name: build x86_64-unknown-linux-musl
+      uses: ebbflow-io/cargo-deb-amd64-ubuntu@1.0
+      
+    - name: Upload Release Asset
+      id: upload-debfile 
+      uses: actions/upload-release-asset@v1
+      env:
+        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      with:
+        upload_url: ${{ steps.get_release.outputs.upload_url }}
+        asset_path: ./target/x86_64-unknown-linux-musl/debian/${{ github.event.repository.name }}_${{ steps.get_version.outputs.version-without-v }}_amd64.deb
+        asset_name: ${{ github.event.repository.name }}_${{ steps.get_version.outputs.version-without-v }}_amd64.deb
+        asset_content_type: application/vnd.debian.binary-package
