@@ -1,6 +1,6 @@
 use anyhow::Result;
 use cursive::event;
-use cursive::menu::MenuTree;
+use cursive::menu::Tree;
 use cursive::view::{Nameable, Resizable, SizeConstraint, Selector};
 use cursive::views::DummyView;
 use cursive::Cursive;
@@ -114,7 +114,7 @@ impl UIMain {
 
         self.siv.menubar().add_subtree(
             "File",
-            MenuTree::new()
+            Tree::new()
                 .leaf("Find", UIMain::on_find)
                 .delimiter()
                 .leaf("Quit", |s| s.quit()),
