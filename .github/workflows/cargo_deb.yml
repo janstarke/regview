@@ -27,6 +27,8 @@ jobs:
     
     - name: build x86_64-unknown-linux-musl
       uses: janstarke/cargo-deb-amd64-ubuntu@v1.61.0
+      with:
+        cmd: bash build/pre.sh; cargo deb --target=x86_64-unknown-linux-musl
       
     - name: Upload Release Asset
       id: upload-debfile 
