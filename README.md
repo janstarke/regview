@@ -8,7 +8,7 @@ Offline-viewer for registry files
 ```shell
 sudo apt install libncurses-dev
 cargo install regview
-
+```
 
 # Usage
 
