@@ -3,6 +3,13 @@ Offline-viewer for registry files
 
 <img src="https://github.com/janstarke/regview/blob/master/doc/regview_sample.png?raw=true">
 
+# Installation
+
+```shell
+sudo apt install libncurses-dev
+cargo install regview
+
+
 # Usage
 
 ```shell
