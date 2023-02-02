@@ -14,9 +14,23 @@ struct Args {
     /// path to registry hive file
     pub (crate) hive_file: String,
 
+    /// transaction LOG file(s). This argument can be specified one or two times.
+    #[clap(short('L'), long("log"))]
+    #[arg(value_parser = validate_file)]
+    logfiles: Vec<PathBuf>,
+
     /// ignore the base block (e.g. if it was encrypted by some ransomware)
     #[clap(short('I'), long)]
     ignore_base_block: bool,
+}
+
+fn validate_file(s: &str) -> Result<PathBuf, String> {
+    let pb = PathBuf::from(s);
+    if pb.is_file() && pb.exists() {
+        Ok(pb)
+    } else {
+        Err(format!("unable to read file: '{s}'"))
+    }
 }
 
 pub struct RegViewApplication {
@@ -35,7 +49,7 @@ impl RegViewApplication {
         };
 
         Ok(Self {
-            hive: Rc::new(RefCell::new(RegistryHive::new(reg_file, cli.ignore_base_block)?))
+            hive: Rc::new(RefCell::new(RegistryHive::new(reg_file, cli.logfiles, cli.ignore_base_block)?))
         })
 
     }

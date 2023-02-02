@@ -1,11 +1,13 @@
-use anyhow::{anyhow, Result};
+use anyhow::{anyhow, Result, bail};
 use regex::Regex;
 use std::cell::RefCell;
 use std::fs::File;
+use std::path::PathBuf;
 use std::rc::Rc;
+use std::convert::TryInto;
 use thiserror::Error;
 
-use nt_hive2::{Hive, KeyNode, RegistryValue, SubPath, HiveParseMode};
+use nt_hive2::{Hive, KeyNode, RegistryValue, SubPath, HiveParseMode, CleanHive, ContainsHive};
 
 use crate::keys_line::KeysLine;
 use crate::search_result::SearchResult;
@@ -22,13 +24,13 @@ pub enum SearchError {
 
 pub struct RegistryHive
 {
-    hive: RefCell<Hive<File>>,
+    hive: RefCell<Hive<File, CleanHive>>,
     path: Vec<String>,
     root: Rc<RefCell<KeyNode>>,
 }
 
 impl RegistryHive {
-    pub fn new(hive_file: File, ignore_base_block: bool) -> Result<Self> {
+    pub fn new(hive_file: File, mut logfiles: Vec<PathBuf>, ignore_base_block: bool) -> Result<Self> {
 
         let parse_mode = if ignore_base_block {
             let hive = Hive::new(&hive_file, HiveParseMode::Raw).unwrap();
@@ -45,10 +47,31 @@ impl RegistryHive {
             HiveParseMode::NormalWithBaseBlock
         };
 
-        let mut hive = Hive::new(hive_file, parse_mode)?;
-        let root = hive.root_key_node()?;
+        let hive = Hive::new(hive_file, parse_mode)?;
+
+        let mut clean_hive = 
+        match logfiles.len() {
+            0 => {
+                log::warn!("no log files provided, treating hive as if it was clean");
+                hive.treat_hive_as_clean()
+            }
+            1 => {
+                hive.with_transaction_log(File::open(logfiles.pop().unwrap())?.try_into()?)?
+                .apply_logs()
+            }
+            2 => {
+                hive.with_transaction_log(File::open(logfiles.pop().unwrap())?.try_into()?)?
+                .with_transaction_log(File::open(logfiles.pop().unwrap())?.try_into()?)?
+                .apply_logs()
+            }
+            _ => {
+                bail!("more than two transaction log files are not supported")
+            }
+        };
+
+        let root = clean_hive.root_key_node()?;
         Ok(Self { 
-            hive:RefCell::new(hive),
+            hive:RefCell::new(clean_hive),
             path: vec![],
             root: Rc::new(RefCell::new(root))
         })
@@ -75,7 +98,7 @@ impl RegistryHive {
         };
 
         for skn in current_node.borrow().subkeys(&mut self.hive.borrow_mut())?.iter() {
-            keys.push(KeysLine::from(&skn));
+            keys.push(KeysLine::from(skn));
         }
         Ok(keys)
     }
@@ -97,7 +120,7 @@ impl RegistryHive {
                 _ => return false
             }
         }
-        return false;
+        false
     }
 
     pub fn leave(&mut self) -> Result<Vec<KeysLine>> {
@@ -153,7 +176,7 @@ impl RegistryHive {
     }
 
     pub fn selected_node(&self) -> Option<String> {
-        self.path.last().and_then(|s| Some(s.to_owned()))
+        self.path.last().map(|s| s.to_owned())
     }
 
     pub fn key_values(&self, record_name: &str) -> Result<Vec<ValuesLine>> {
@@ -175,7 +198,7 @@ impl RegistryHive {
         };
 
         for value in current_node.borrow().values() {
-            value_list.push(ValuesLine::from(&value)?);
+            value_list.push(ValuesLine::from(value)?);
         }
         Ok(value_list)
     }
@@ -188,9 +211,9 @@ impl RegistryHive {
 
         self.find_here_and_below(&mut current_path, &root, &regex, &mut search_result)?;
         if search_result.is_empty() {
-            return Err(anyhow!(SearchError::NoResult));
+            Err(anyhow!(SearchError::NoResult))
         } else {
-            return Ok(search_result);
+            Ok(search_result)
         }
     }
 
@@ -202,7 +225,7 @@ impl RegistryHive {
         search_result: &mut Vec<SearchResult>,
     ) -> Result<()> {
         self.find_in_this_node(current_path, current_node, search_regex, search_result)?;
-        self.find_in_subkeys_of(current_path, &current_node, search_regex, search_result)?;
+        self.find_in_subkeys_of(current_path, current_node, search_regex, search_result)?;
         Ok(())
     }
 
@@ -218,15 +241,15 @@ impl RegistryHive {
         /*
          * key name matches
          */
-        if search_regex.is_match(&subkey_name) {
+        if search_regex.is_match(subkey_name) {
             let current_path = current_path.clone();
-            search_result.push(SearchResult::KeyName(current_path.clone()));
+            search_result.push(SearchResult::KeyName(current_path));
         }
 
         /*
          * check attributes
          */
-        self.find_in_attributes(current_path, &current_node, search_regex, search_result)
+        self.find_in_attributes(current_path, current_node, search_regex, search_result)
     }
 
     fn find_in_subkeys_of(
@@ -238,7 +261,7 @@ impl RegistryHive {
     ) -> Result<()> {
         let subkeys: Vec<Rc<RefCell<KeyNode>>> = current_node.subkeys(&mut self.hive.borrow_mut())?
             .iter()
-            .map(|sk| Rc::clone(sk))
+            .map(Rc::clone)
             .collect();
         for subkey in subkeys {
             let subkey_name = subkey.borrow().name().to_owned();
