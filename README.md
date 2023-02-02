@@ -13,17 +13,16 @@ cargo install regview
 # Usage
 
 ```shell
-regview 0.2.3
-
 Offline-viewer for registry files
 
-USAGE:
-    regview [FLAGS] <REG_FILE>
+Usage: regview [OPTIONS] <HIVE_FILE>
 
-FLAGS:
-    -h, --help               Prints help information
-    -V, --version            Prints version information
+Arguments:
+  <HIVE_FILE>  path to registry hive file
 
-ARGS:
-    <REG_FILE>    path to registry hive file
+Options:
+  -L, --log <LOGFILES>     transaction LOG file(s). This argument can be specified one or two times
+  -I, --ignore-base-block  ignore the base block (e.g. if it was encrypted by some ransomware)
+  -h, --help               Print help
+  -V, --version            Print version
 ```
