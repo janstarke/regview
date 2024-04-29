@@ -45,7 +45,7 @@ impl UIMain {
         let user_data = RegviewUserdata {
             hive,
             search_regex: None,
-            log_level
+            log_level,
         };
         siv.set_user_data(user_data);
         let mut me = Self { siv, log_level };
@@ -67,7 +67,7 @@ impl UIMain {
         let details_table = TableView::<ValuesLine, ValuesColumn>::new()
             .column(ValuesColumn::Name, "Name", |c| c.width(24))
             .column(ValuesColumn::Data, "Value", |c| c)
-            .column(ValuesColumn::Type, "Datatype", |c| c.width(16));
+            .column(ValuesColumn::Type, "Datatype", |c| c.width(20));
 
         //details_table.set_enabled(false);
 
