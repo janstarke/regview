@@ -8,7 +8,10 @@ use cursive::{
     views::{Dialog, EditView, LinearLayout, OnEventView, Panel, ResizedView, TextView, ViewRef},
     CursiveRunnable,
 };
+use cursive_flexi_logger_view::{cursive_flexi_logger, FlexiLoggerView};
 use cursive_table_view::TableView;
+use flexi_logger::Logger;
+use log::Level;
 use std::cell::RefCell;
 use std::rc::Rc;
 
@@ -26,6 +29,7 @@ static NAME_SEARCH_PANEL: &str = "search_panel";
 
 pub struct UIMain {
     siv: CursiveRunnable,
+    log_level: Option<Level>,
 }
 
 struct RegviewUserdata {
@@ -34,7 +38,7 @@ struct RegviewUserdata {
 }
 
 impl UIMain {
-    pub fn new(hive: Rc<RefCell<RegistryHive>>) -> Self {
+    pub fn new(hive: Rc<RefCell<RegistryHive>>, log_level: Option<Level>) -> Self {
         let mut siv = cursive::default();
 
         let user_data = RegviewUserdata {
@@ -42,7 +46,7 @@ impl UIMain {
             search_regex: None,
         };
         siv.set_user_data(user_data);
-        let mut me = Self { siv };
+        let mut me = Self { siv, log_level };
         me.construct();
         me
     }
@@ -89,7 +93,7 @@ impl UIMain {
 
         search_results.set_on_submit(UIMain::on_select_search_result);
 
-        let root_view = LinearLayout::vertical()
+        let mut root_view = LinearLayout::vertical()
             .child(TextView::new("").with_name(NAME_PATH_LINE))
             .child(reg_view)
             .child(
@@ -103,6 +107,10 @@ impl UIMain {
                 .title("Search results")
                 .with_name(NAME_SEARCH_PANEL),
             );
+
+        if self.log_level.is_some() {
+            root_view.add_child(FlexiLoggerView::scrollable().min_height(10).max_height(20));
+        }
 
         self.siv.add_layer(
             Panel::new(ResizedView::new(
@@ -131,17 +139,28 @@ impl UIMain {
 
         self.siv
             .add_global_callback(event::Key::F3, UIMain::on_find);
+
+        if let Some(log_level) = self.log_level {
+            Logger::try_with_str(log_level.as_str().to_ascii_lowercase())
+                .expect("Could not create Logger from environment :(")
+                .log_to_writer(cursive_flexi_logger(&self.siv))
+                .format(flexi_logger::colored_with_thread)
+                .start()
+                .inspect_err(|why| {
+                    panic!(
+                        "failed to initialize logger for level '{}': {}",
+                        log_level.as_str().to_ascii_lowercase(),
+                        why
+                    )
+                })
+                .unwrap();
+        }
     }
 
     fn on_find(siv: &mut Cursive) {
         let user_data: &mut RegviewUserdata = siv.user_data().unwrap();
         let edit_view = EditView::new()
-            .content(
-                user_data
-                    .search_regex
-                    .as_ref()
-                    .unwrap_or(&"".to_owned()),
-            )
+            .content(user_data.search_regex.as_ref().unwrap_or(&"".to_owned()))
             .with_name(NAME_SEARCH_REGEX)
             .min_width(32);
 

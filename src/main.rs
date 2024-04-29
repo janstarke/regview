@@ -11,7 +11,6 @@ mod search_result;
 use regviewapplication::*;
 
 fn main() -> Result<()> {
-    cursive::logger::init();
     let app = RegViewApplication::new()?;
     app.run()
 }
