@@ -108,7 +108,13 @@ impl UIMain {
                 .with_name(NAME_SEARCH_PANEL),
             );
 
-        if self.log_level.is_some() {
+        if let Some(log_level) = self.log_level {
+            Logger::try_with_str(log_level.as_str().to_ascii_lowercase())
+                .expect("Could not create Logger from environment :(")
+                .log_to_writer(cursive_flexi_logger(&self.siv))
+                .format(flexi_logger::colored_with_thread)
+                .start()
+                .expect("failed to initialize logger");
             root_view.add_child(FlexiLoggerView::scrollable().min_height(10).max_height(20));
         }
 
@@ -139,22 +145,6 @@ impl UIMain {
 
         self.siv
             .add_global_callback(event::Key::F3, UIMain::on_find);
-
-        if let Some(log_level) = self.log_level {
-            Logger::try_with_str(log_level.as_str().to_ascii_lowercase())
-                .expect("Could not create Logger from environment :(")
-                .log_to_writer(cursive_flexi_logger(&self.siv))
-                .format(flexi_logger::colored_with_thread)
-                .start()
-                .inspect_err(|why| {
-                    panic!(
-                        "failed to initialize logger for level '{}': {}",
-                        log_level.as_str().to_ascii_lowercase(),
-                        why
-                    )
-                })
-                .unwrap();
-        }
     }
 
     fn on_find(siv: &mut Cursive) {
