@@ -182,8 +182,10 @@ impl RegistryHive {
     pub fn key_values(&self, record_name: &str) -> Result<Vec<ValuesLine>> {
         let mut value_list = Vec::new();
         let root = self.hive.borrow_mut().root_key_node()?;
+        let mut path = self.path().clone();
+        path.push(record_name.into());
 
-        let current_node = match root.subpath(&(self.path().join("\\") + "\\" + record_name), &mut self.hive.borrow_mut())? {
+        let current_node = match root.subpath(&path, &mut self.hive.borrow_mut())? {
             None => {
                 if self.path().is_empty() {
                     Rc::new(RefCell::new(root))

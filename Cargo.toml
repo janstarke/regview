@@ -17,7 +17,8 @@ depends = "libncurses6 (>=6.2)"
 [dependencies]
 anyhow = "1"
 clap = {version="4", features=["derive"]}
-simplelog = "0.12"
+clap-verbosity-flag = "2.0.0"
+flexi_logger = "0.22"
 log = "0.4"
 cursive = "0.20"
 cursive_table_view = "0.14"
