@@ -56,8 +56,8 @@ impl TableViewItem<SearchResultColumns> for SearchResultLine {
     fn to_column(&self, column: SearchResultColumns) -> String {
         match column {
             SearchResultColumns::KeyName => self.path.join("\\"),
-            SearchResultColumns::ValueName => (&self.value_name).as_ref().or(Some(&String::new())).unwrap().clone(),
-            SearchResultColumns::ValueData => (&self.value_data).as_ref().or(Some(&String::new())).unwrap().clone(),
+            SearchResultColumns::ValueName => self.value_name.as_ref().unwrap_or(&String::new()).clone(),
+            SearchResultColumns::ValueData => self.value_data.as_ref().unwrap_or(&String::new()).clone(),
         }
     }
 
