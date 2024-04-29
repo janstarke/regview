@@ -184,11 +184,9 @@ impl RegistryHive {
         let root = self.hive.borrow_mut().root_key_node()?;
         let mut path = self.path().clone();
         path.push(record_name.into());
-        let path = path.join("\\");
 
         let current_node = match root.subpath(&path, &mut self.hive.borrow_mut())? {
             None => {
-                log::warn!("there is no node with the name '{path}'");
                 if self.path().is_empty() {
                     Rc::new(RefCell::new(root))
                 } else {
