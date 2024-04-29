@@ -24,10 +24,10 @@ pub struct KeysLine {
 impl KeysLine {
     pub fn from(nk: &Rc<RefCell<KeyNode>>) -> Self {
         let name = nk.borrow().name().to_owned();
-        let last_written = nk.borrow().timestamp().clone();
+        let last_written = *nk.borrow().timestamp();
         Self {
             //record: nk,
-            name: name,
+            name,
             is_parent: false,
             is_leaf_node: nk.borrow().subkey_count() == 0,
             last_written
@@ -41,7 +41,7 @@ impl KeysLine {
             //timestamp: WinTimestamp::from(0),
             is_parent: true,
             is_leaf_node: false,
-            last_written: chrono::MIN_DATETIME
+            last_written: DateTime::<Utc>::MIN_UTC
         }
     }
     pub fn is_parent(&self) -> bool {
@@ -66,17 +66,15 @@ impl TableViewItem<KeysColumn> for KeysLine {
         match column {
             KeysColumn::NodeType => {
                 if self.is_leaf_node {"".to_owned()}
-                else {
-                    if self.is_parent {
-                        "^".to_owned()
-                    } else {
-                        "v".to_owned()
-                    }
+                else if self.is_parent {
+                    "^".to_owned()
+                } else {
+                    "v".to_owned()
                 }
             }
             KeysColumn::Name => self.name.to_owned(),
             KeysColumn::LastWritten => {
-                if self.last_written == chrono::MIN_DATETIME {
+                if self.last_written == DateTime::<Utc>::MIN_UTC {
                     "".to_owned()
                 } else {
                     self.last_written.format("%F %T").to_string()
@@ -95,15 +93,13 @@ impl TableViewItem<KeysColumn> for KeysLine {
             } else {
                 std::cmp::Ordering::Less
             }
+        } else if other.is_parent {
+            std::cmp::Ordering::Greater
         } else {
-            if other.is_parent {
-                std::cmp::Ordering::Greater
-            } else {
-                match column {
-                    KeysColumn::NodeType => self.is_leaf_node.cmp(&other.is_leaf_node),
-                    KeysColumn::Name => self.name.cmp(&other.name),
-                    KeysColumn::LastWritten => self.last_written.cmp(&other.last_written),
-                }
+            match column {
+                KeysColumn::NodeType => self.is_leaf_node.cmp(&other.is_leaf_node),
+                KeysColumn::Name => self.name.cmp(&other.name),
+                KeysColumn::LastWritten => self.last_written.cmp(&other.last_written),
             }
         }
     }

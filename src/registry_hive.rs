@@ -231,7 +231,7 @@ impl RegistryHive {
 
     fn find_in_this_node(
         &self,
-        current_path: &mut Vec<String>,
+        current_path: &mut [String],
         current_node: &KeyNode,
         search_regex: &Regex,
         search_result: &mut Vec<SearchResult>,
@@ -242,7 +242,7 @@ impl RegistryHive {
          * key name matches
          */
         if search_regex.is_match(subkey_name) {
-            let current_path = current_path.clone();
+            let current_path = Vec::from(&mut *current_path);
             search_result.push(SearchResult::KeyName(current_path));
         }
 
@@ -279,7 +279,7 @@ impl RegistryHive {
 
     fn find_in_attributes(
         &self,
-        current_path: &mut Vec<String>,
+        current_path: &mut[String],
         current_node: &KeyNode,
         search_regex: &Regex,
         search_result: &mut Vec<SearchResult>,
@@ -325,13 +325,13 @@ impl RegistryHive {
             match (name_matches, matching_value, ) {
                 (true, Some(v)) => add_search_result(
                     search_result, 
-                    SearchResult::ValueNameAndData(current_path.clone(), value.name().to_owned(), v))?,
+                    SearchResult::ValueNameAndData(Vec::from(&mut *current_path), value.name().to_owned(), v))?,
                 (true, None) => add_search_result(
                     search_result,
-                    SearchResult::ValueName(current_path.clone(), value.name().to_owned()))?,
+                    SearchResult::ValueName(Vec::from(&mut *current_path), value.name().to_owned()))?,
                 (false, Some(v)) => add_search_result(
                     search_result,
-                    SearchResult::ValueData(current_path.clone(), value.name().to_owned(), v),
+                    SearchResult::ValueData(Vec::from(&mut *current_path), value.name().to_owned(), v),
                 )?,
                 (false, None) => (),
             }

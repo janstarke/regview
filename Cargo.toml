@@ -1,6 +1,6 @@
 [package]
 name = "regview"
-version = "0.4.0"
+version = "0.4.1"
 edition = "2018"
 description = "Offline-viewer for registry files"
 repository = "https://github.com/janstarke/regview"
@@ -24,7 +24,7 @@ cursive_table_view = "0.14"
 memmap = "0.7"
 cursive-flexi-logger-view = "^0"
 
-nt_hive2 = "3"
+nt_hive2 = "4.2"
 # nt_hive2 = {version="1", path="../nt-hive2" }
 regex = "1.5"
 thiserror = "1.0"

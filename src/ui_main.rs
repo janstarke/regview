@@ -1,7 +1,7 @@
 use anyhow::Result;
 use cursive::event;
 use cursive::menu::Tree;
-use cursive::view::{Nameable, Resizable, SizeConstraint, Selector};
+use cursive::view::{Nameable, Resizable, Selector, SizeConstraint};
 use cursive::views::DummyView;
 use cursive::Cursive;
 use cursive::{
@@ -13,9 +13,9 @@ use std::cell::RefCell;
 use std::rc::Rc;
 
 use crate::keys_line::*;
-use crate::registry_hive::{RegistryHive};
-use crate::values_line::*;
+use crate::registry_hive::RegistryHive;
 use crate::search_result::*;
+use crate::values_line::*;
 
 static NAME_KEYS_TABLE: &str = "keys_table";
 static NAME_VALUES_TABLE: &str = "values_table";
@@ -42,7 +42,7 @@ impl UIMain {
             search_regex: None,
         };
         siv.set_user_data(user_data);
-        let mut me = Self { siv: siv };
+        let mut me = Self { siv };
         me.construct();
         me
     }
@@ -51,10 +51,9 @@ impl UIMain {
         self.siv.add_global_callback('q', |s| s.quit());
 
         let mut keys_table = TableView::<KeysLine, KeysColumn>::new()
-            .column(KeysColumn::NodeType, "", |c|{c.width(1)})
-            .column(KeysColumn::Name, "Name", |c| {c})
-            .column(KeysColumn::LastWritten, "Timestamp", |c| {c}.width(20))
-        ;
+            .column(KeysColumn::NodeType, "", |c| c.width(1))
+            .column(KeysColumn::Name, "Name", |c| c)
+            .column(KeysColumn::LastWritten, "Timestamp", |c| { c }.width(20));
 
         keys_table.set_on_submit(UIMain::on_submit);
         keys_table.set_on_select(UIMain::on_select);
@@ -94,9 +93,15 @@ impl UIMain {
             .child(TextView::new("").with_name(NAME_PATH_LINE))
             .child(reg_view)
             .child(
-                Panel::new(search_results.with_name(NAME_SEARCH_RESULTS).full_width().max_height(10).min_height(10))
+                Panel::new(
+                    search_results
+                        .with_name(NAME_SEARCH_RESULTS)
+                        .full_width()
+                        .max_height(10)
+                        .min_height(10),
+                )
                 .title("Search results")
-                .with_name(NAME_SEARCH_PANEL)
+                .with_name(NAME_SEARCH_PANEL),
             );
 
         self.siv.add_layer(
@@ -135,8 +140,7 @@ impl UIMain {
                 user_data
                     .search_regex
                     .as_ref()
-                    .or(Some(&"".to_owned()))
-                    .unwrap(),
+                    .unwrap_or(&"".to_owned()),
             )
             .with_name(NAME_SEARCH_REGEX)
             .min_width(32);
@@ -193,21 +197,29 @@ impl UIMain {
                     }
                 };
 
-                siv.call_on_name(NAME_SEARCH_RESULTS, |sr_table: &mut TableView<SearchResultLine, SearchResultColumns>| {
-                    sr_table.clear();
-                    sr_table.set_items(search_result.into_iter().map(SearchResultLine::from).collect());
-
-                });
+                siv.call_on_name(
+                    NAME_SEARCH_RESULTS,
+                    |sr_table: &mut TableView<SearchResultLine, SearchResultColumns>| {
+                        sr_table.clear();
+                        sr_table.set_items(
+                            search_result
+                                .into_iter()
+                                .map(SearchResultLine::from)
+                                .collect(),
+                        );
+                    },
+                );
                 let _ = siv.focus(&Selector::Name(NAME_SEARCH_RESULTS));
             }
         }
     }
 
     fn on_select_search_result(siv: &mut Cursive, _: usize, index: usize) {
-        let search_results_table: ViewRef<TableView<SearchResultLine, SearchResultColumns>> =siv.find_name(NAME_SEARCH_RESULTS).unwrap();
+        let search_results_table: ViewRef<TableView<SearchResultLine, SearchResultColumns>> =
+            siv.find_name(NAME_SEARCH_RESULTS).unwrap();
         let mut selected_line = match search_results_table.borrow_item(index) {
             None => return,
-            Some(item) => item.clone()
+            Some(item) => item.clone(),
         };
 
         let displayed_path = selected_line.path.join("\\");
@@ -228,24 +240,25 @@ impl UIMain {
         };
 
         let mut keys_table: ViewRef<TableView<KeysLine, KeysColumn>> =
-        siv.find_name(NAME_KEYS_TABLE).unwrap();
+            siv.find_name(NAME_KEYS_TABLE).unwrap();
         keys_table.clear();
 
         let selection_index = match my_key {
-            Some(kn) =>  new_items.iter().position(|i| i.name() == kn),
-            None => None
+            Some(kn) => new_items.iter().position(|i| i.name() == kn),
+            None => None,
         };
 
         keys_table.set_items(new_items);
         let selected_item = if let Some(index) = selection_index {
             keys_table.set_selected_item(index);
-            keys_table.borrow_item(index) 
-        } else { None };
+            keys_table.borrow_item(index)
+        } else {
+            None
+        };
 
         siv.call_on_name(NAME_PATH_LINE, |l: &mut TextView| {
             l.set_content(displayed_path)
         });
-
 
         let new_items = match selected_item {
             None => Vec::new(),
@@ -262,8 +275,7 @@ impl UIMain {
 
         let value_index = match selected_line.value_name {
             None => None,
-            Some(vn) => new_items.iter()
-                .position(|vl| vl.name() == vn)
+            Some(vn) => new_items.iter().position(|vl| vl.name() == vn),
         };
 
         let mut values_table: ViewRef<TableView<ValuesLine, ValuesColumn>> =
@@ -275,7 +287,6 @@ impl UIMain {
         }
 
         keys_table.sort();
-
     }
 
     fn on_submit(siv: &mut Cursive, _: usize, index: usize) {
@@ -291,27 +302,25 @@ impl UIMain {
         };
 
         let new_items = if selected_node.is_parent() {
-            select_node = select_node & true;
+            select_node &= true;
             let result = hive.borrow_mut().leave();
             match result {
                 Err(why) => {
                     Self::display_error(siv, why);
                     return;
                 }
-                Ok(value) => value
+                Ok(value) => value,
             }
+        } else if selected_node.is_leaf_node() {
+            return;
         } else {
-            if selected_node.is_leaf_node() {
-                return;
-            } else {
-                let result = hive.borrow_mut().enter(selected_node.name());
-                match result  {
-                    Err(why) => {
-                        Self::display_error(siv, why);
-                        return;
-                    }
-                    Ok(value) => value
+            let result = hive.borrow_mut().enter(selected_node.name());
+            match result {
+                Err(why) => {
+                    Self::display_error(siv, why);
+                    return;
                 }
+                Ok(value) => value,
             }
         };
 
@@ -332,7 +341,6 @@ impl UIMain {
 
         let path = hive.borrow().path().join("\\");
         siv.call_on_name(NAME_PATH_LINE, |l: &mut TextView| l.set_content(path));
-
     }
 
     fn on_select(siv: &mut Cursive, _: usize, index: usize) {
@@ -354,7 +362,7 @@ impl UIMain {
                             Self::display_error(siv, why);
                             return;
                         }
-                        Ok(value) => value
+                        Ok(value) => value,
                     }
                 }
             }
