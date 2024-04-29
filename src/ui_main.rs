@@ -35,6 +35,7 @@ pub struct UIMain {
 struct RegviewUserdata {
     hive: Rc<RefCell<RegistryHive>>,
     search_regex: Option<String>,
+    log_level: Option<Level>,
 }
 
 impl UIMain {
@@ -44,6 +45,7 @@ impl UIMain {
         let user_data = RegviewUserdata {
             hive,
             search_regex: None,
+            log_level
         };
         siv.set_user_data(user_data);
         let mut me = Self { siv, log_level };
@@ -180,6 +182,12 @@ impl UIMain {
     }
 
     fn display_error(siv: &mut Cursive, error: anyhow::Error) {
+        if let Some(user_data) = siv.user_data::<RegviewUserdata>() {
+            if user_data.log_level.is_some() {
+                log::error!("{error}");
+                return;
+            }
+        }
         siv.add_layer(Dialog::info(format!("ERROR: {}", error)));
     }
 
@@ -360,8 +368,10 @@ impl UIMain {
             None => Vec::new(),
             Some(item) => {
                 if item.is_parent() {
+                    log::info!("selected current root");
                     vec![]
                 } else {
+                    log::info!("selected key: {}", item.name());
                     let user_data: &RegviewUserdata = siv.user_data().unwrap();
                     let hive = &user_data.hive;
 
