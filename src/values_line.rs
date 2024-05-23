@@ -29,7 +29,7 @@ impl ValuesLine {
             RegistryValue::RegBinary(val) => {
                 // Sometimes, strings are stored as UTF-16LE, so try this:
                 let (value, _, is_error) = UTF_16LE.decode(&val[..]);
-                if !is_error && value.is_ascii() {
+                if !is_error && value.is_ascii() && ! value.contains('\0') {
                     let value = escape(&value).replace('\0', r#"\0"#);
                     ("RegBinary (UTF-16LE)", value)
                 } else {
@@ -42,8 +42,9 @@ impl ValuesLine {
                             } else {
                                 ("RegBinary (CP1252)", format!("{value}"))
                             }
-                        } else if value.is_ascii() {
-                            ("RegBinary (CP1252)", format!("{value}"))
+                        } else if value.is_ascii() && ! value.contains('\0') {
+                            let value = escape(&value).replace('\0', r#"\0"#);
+                            ("RegBinary (CP1252)", value)
                         } else {
                             ("RegBinary", format!("{:X?}", val))
                         }
