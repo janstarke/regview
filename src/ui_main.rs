@@ -386,7 +386,6 @@ impl UIMain {
                 }
             }
         };
-
         let mut values_table: ViewRef<TableView<ValuesLine, ValuesColumn>> =
             siv.find_name(NAME_VALUES_TABLE).unwrap();
         values_table.clear();

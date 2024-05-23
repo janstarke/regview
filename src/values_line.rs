@@ -1,6 +1,7 @@
 use anyhow::Result;
 use cursive_table_view::TableViewItem;
 use encoding_rs::{UTF_16LE, WINDOWS_1252};
+use escape_string::escape;
 use nt_hive2::{KeyValue, RegistryValue};
 use uuid::Uuid;
 
@@ -28,8 +29,9 @@ impl ValuesLine {
             RegistryValue::RegBinary(val) => {
                 // Sometimes, strings are stored as UTF-16LE, so try this:
                 let (value, _, is_error) = UTF_16LE.decode(&val[..]);
-                if !is_error && value.is_ascii() {
-                    ("RegBinary (UTF-16LE)", format!("{value}"))
+                if !is_error && value.is_ascii() && ! value.contains('\0') {
+                    let value = escape(&value).replace('\0', r#"\0"#);
+                    ("RegBinary (UTF-16LE)", value)
                 } else {
                     // Hmm, maybe this is ASCII? Let's try:
                     let (value, _, is_error) = WINDOWS_1252.decode(&val[..]);
@@ -40,8 +42,9 @@ impl ValuesLine {
                             } else {
                                 ("RegBinary (CP1252)", format!("{value}"))
                             }
-                        } else if value.is_ascii() {
-                            ("RegBinary (CP1252)", format!("{value}"))
+                        } else if value.is_ascii() && ! value.contains('\0') {
+                            let value = escape(&value).replace('\0', r#"\0"#);
+                            ("RegBinary (CP1252)", value)
                         } else {
                             ("RegBinary", format!("{:X?}", val))
                         }
