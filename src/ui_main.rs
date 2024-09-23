@@ -3,11 +3,11 @@ use cursive::event;
 use cursive::menu::Tree;
 use cursive::view::{Nameable, Resizable, Selector, SizeConstraint};
 use cursive::views::DummyView;
-use cursive::Cursive;
-use cursive::{
-    views::{Dialog, EditView, LinearLayout, OnEventView, Panel, ResizedView, TextView, ViewRef},
-    CursiveRunnable,
+use cursive::views::{
+    Dialog, EditView, LinearLayout, OnEventView, Panel, ResizedView, TextView, ViewRef,
 };
+use cursive::Cursive;
+use cursive::CursiveExt;
 use cursive_flexi_logger_view::{cursive_flexi_logger, FlexiLoggerView};
 use cursive_table_view::TableView;
 use flexi_logger::Logger;
@@ -28,7 +28,7 @@ static NAME_SEARCH_RESULTS: &str = "search_results";
 static NAME_SEARCH_PANEL: &str = "search_panel";
 
 pub struct UIMain {
-    siv: CursiveRunnable,
+    siv: Cursive,
     log_level: Option<Level>,
 }
 
@@ -40,7 +40,7 @@ struct RegviewUserdata {
 
 impl UIMain {
     pub fn new(hive: Rc<RefCell<RegistryHive>>, log_level: Option<Level>) -> Self {
-        let mut siv = cursive::default();
+        let mut siv = Cursive::new();
 
         let user_data = RegviewUserdata {
             hive,
